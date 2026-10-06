@@ -1,0 +1,65 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Please remove personal information from media titles, logs, screenshots, and crash dumps.
+  - type: input
+    id: version
+    attributes:
+      label: Revision or release
+      placeholder: Commit SHA or release tag
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: Build mode
+      options: [Release, Debug, RelWithDebInfo, No-CRT]
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2, build 26100
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Start...\n2. Play...\n3. Toggle..."
+    validations:
+      required: true
+  - type: textarea
+    id: media
+    attributes:
+      label: Media application and renderer context
+      description: Name the player/browser and whether this is standalone or integration mode.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant build output or logs
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checklist
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed private media metadata and credentials from attachments.
+          required: true
+        - label: I am using an official release or cutting-edge artifact without unrelated binary modifications.
+          required: true
+

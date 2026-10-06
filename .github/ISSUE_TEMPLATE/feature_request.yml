@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an improvement or integration capability
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Describe the user or integration need rather than only the proposed implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Standalone overlay, Media detection, UI and customization, D3D9, D3D10, D3D11, D3D12, No-CRT, Build and packaging, Documentation]
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checklist
+      options:
+        - label: I searched existing issues and discussions for this request.
+          required: true
+        - label: This request is within the Windows music-overlay or DirectX integration scope.
+          required: true
+
+

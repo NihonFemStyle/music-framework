@@ -1,0 +1,57 @@
+name: Compatibility report
+description: Report results for a GPU, Windows release, media player, or DirectX host
+title: "[Compatibility]: "
+labels: ["compatibility", "needs-triage"]
+body:
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options: [Working, Partially working, Not working]
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Release, artifact, or commit
+      placeholder: v1.0.0 or full commit SHA
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and build
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: GPU and driver version
+    validations:
+      required: true
+  - type: dropdown
+    id: renderer
+    attributes:
+      label: Renderer context
+      options: [Standalone D3D11, Integrated D3D9, Integrated D3D10, Integrated D3D11, Integrated D3D12, No-CRT]
+    validations:
+      required: true
+  - type: input
+    id: player
+    attributes:
+      label: Media application
+      placeholder: Spotify, Firefox, Chrome, Apple Music, etc.
+  - type: textarea
+    id: details
+    attributes:
+      label: Results and reproduction details
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed private media metadata and unrelated personal information.
+          required: true
+

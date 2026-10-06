@@ -1,0 +1,3 @@
+#include "resource.h"
+IDI_MUSICOVERLAY ICON "../../assets/app.ico"
+IDR_BANNER_PNG RCDATA "../../assets/banner.png"

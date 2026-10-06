@@ -1,0 +1,78 @@
+#include <windows.h>
+#include <windowsx.h>
+#include <shellapi.h>
+#include <commdlg.h>
+#include <commctrl.h>
+#include <d3d11.h>
+#include <dxgi.h>
+#include <dwmapi.h>
+#include <wrl/client.h>
+#include <winrt/base.h>
+#include <MusicOverlay/Integration/MusicOverlay.h>
+#include "Platform/Windows/MediaSessionManager.h"
+#include "resource.h"
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+using Microsoft::WRL::ComPtr;
+namespace {
+constexpr wchar_t kClassName[]=L"NihonsMusicFrameworkWindow";
+constexpr UINT_PTR kTimer=1;
+constexpr UINT kTrayMessage=WM_APP+1;
+constexpr UINT kTrayId=1;
+constexpr UINT kMenuSettings=1001,kMenuToggle=1002,kMenuExit=1003;
+constexpr int kNormalWidth=430,kNormalHeight=112,kCompactWidth=330,kCompactHeight=76,kSettingsHeight=394;
+mo::OverlayState g_state; mo::win::MediaSessionManager g_media(g_state);
+std::unique_ptr<mo::IntegrationContext> g_overlay; ComPtr<ID3D11Device> g_device; ComPtr<ID3D11DeviceContext> g_context; ComPtr<IDXGISwapChain> g_swap;
+mo::Appearance g_appearance; const std::uint8_t* g_bannerData{}; std::uint32_t g_bannerSize{};
+std::wstring g_settingsPath,g_comboName=L"Shift"; std::vector<int> g_combo{VK_SHIFT},g_recorded;
+bool g_interactive{},g_comboWasDown{},g_recording{}; ULONGLONG g_lastTap{},g_lastMediaPoll{}; bool g_scanWasDown[256]{}; int g_backend=11;
+NOTIFYICONDATAW g_tray{};
+int g_targetHeight{};bool g_settingsClosing{};
+
+std::wstring keyName(int vk){wchar_t name[64]{};UINT scan=MapVirtualKeyW(vk,MAPVK_VK_TO_VSC)<<16;if(vk==VK_LEFT||vk==VK_UP||vk==VK_RIGHT||vk==VK_DOWN||vk==VK_RCONTROL||vk==VK_RMENU)scan|=1<<24;if(GetKeyNameTextW(static_cast<LONG>(scan),name,64)>0)return name;wchar_t fallback[16]{};wsprintfW(fallback,L"VK %02X",vk);return fallback;}
+void updateComboName(){g_comboName.clear();for(size_t i=0;i<g_combo.size();++i){if(i)g_comboName+=L" + ";g_comboName+=keyName(g_combo[i]);}g_appearance.activationKeyName=g_recording?L"Press keys...":g_comboName.c_str();}
+bool comboDown(){for(int vk:g_combo)if(!(GetAsyncKeyState(vk)&0x8000))return false;return !g_combo.empty();}
+void saveSettings(){WritePrivateProfileStringW(L"Overlay",L"Opacity",std::to_wstring(static_cast<int>(g_appearance.opacity*100)).c_str(),g_settingsPath.c_str());WritePrivateProfileStringW(L"Overlay",L"Accent",std::to_wstring(g_appearance.accentRgb).c_str(),g_settingsPath.c_str());WritePrivateProfileStringW(L"Overlay",L"Compact",g_appearance.compact?L"1":L"0",g_settingsPath.c_str());WritePrivateProfileStringW(L"Overlay",L"ArtworkBackground",g_appearance.artworkBackground?L"1":L"0",g_settingsPath.c_str());WritePrivateProfileStringW(L"Overlay",L"DynamicAccent",g_appearance.dynamicAccent?L"1":L"0",g_settingsPath.c_str());WritePrivateProfileStringW(L"Overlay",L"Backend",std::to_wstring(g_backend).c_str(),g_settingsPath.c_str());std::wstring keys;for(size_t i=0;i<g_combo.size();++i){if(i)keys+=L",";keys+=std::to_wstring(g_combo[i]);}WritePrivateProfileStringW(L"Overlay",L"Shortcut",keys.c_str(),g_settingsPath.c_str());}
+void loadSettings(){wchar_t local[MAX_PATH]{};GetEnvironmentVariableW(L"LOCALAPPDATA",local,MAX_PATH);std::wstring dir=std::wstring(local)+L"\\NihonsMusicFramework";CreateDirectoryW(dir.c_str(),nullptr);g_settingsPath=dir+L"\\settings.ini";if(GetFileAttributesW(g_settingsPath.c_str())==INVALID_FILE_ATTRIBUTES){TASKDIALOG_BUTTON buttons[]={{9,L"DirectX 9"},{10,L"DirectX 10"},{11,L"DirectX 11 (recommended)"},{12,L"DirectX 12"}};TASKDIALOGCONFIG c{};c.cbSize=sizeof(c);c.dwFlags=TDF_USE_COMMAND_LINKS;c.pszWindowTitle=L"Nihon's Music Framework";c.pszMainInstruction=L"Choose a renderer";c.pszContent=L"You can change this later. A renderer change takes effect after restart.";c.pButtons=buttons;c.cButtons=4;c.nDefaultButton=11;int selected=11;TaskDialogIndirect(&c,&selected,nullptr,nullptr);g_backend=selected;saveSettings();}g_appearance.opacity=std::clamp(GetPrivateProfileIntW(L"Overlay",L"Opacity",92,g_settingsPath.c_str())/100.f,.1f,1.f);g_appearance.accentRgb=GetPrivateProfileIntW(L"Overlay",L"Accent",0x68D5C8,g_settingsPath.c_str());g_appearance.compact=GetPrivateProfileIntW(L"Overlay",L"Compact",0,g_settingsPath.c_str())!=0;g_appearance.artworkBackground=GetPrivateProfileIntW(L"Overlay",L"ArtworkBackground",0,g_settingsPath.c_str())!=0;g_appearance.dynamicAccent=GetPrivateProfileIntW(L"Overlay",L"DynamicAccent",0,g_settingsPath.c_str())!=0;g_backend=GetPrivateProfileIntW(L"Overlay",L"Backend",11,g_settingsPath.c_str());wchar_t keys[256]{};GetPrivateProfileStringW(L"Overlay",L"Shortcut",L"16",keys,256,g_settingsPath.c_str());g_combo.clear();wchar_t* p=keys;while(*p){wchar_t* end{};long value=wcstol(p,&end,10);if(end==p)break;if(value>0&&value<256)g_combo.push_back(static_cast<int>(value));p=(*end==L',')?end+1:end;}if(g_combo.empty())g_combo={VK_SHIFT};updateComboName();}
+void updateBackendName(){static const wchar_t* names[]{L"DirectX 9",L"DirectX 10",L"DirectX 11",L"DirectX 12"};int index=g_backend==9?0:g_backend==10?1:g_backend==12?3:2;g_appearance.backendName=names[index];}
+bool createDevice(HWND hwnd){DXGI_SWAP_CHAIN_DESC d{};d.BufferCount=2;d.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;d.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;d.OutputWindow=hwnd;d.SampleDesc.Count=1;d.Windowed=TRUE;d.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0,D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0};if(FAILED(D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,levels,3,D3D11_SDK_VERSION,&d,&g_swap,&g_device,nullptr,&g_context)))return false;g_overlay=std::make_unique<mo::IntegrationContext>(mo::Backend::D3D11);return g_overlay->initialize({hwnd,g_device.Get(),g_swap.Get(),nullptr});}
+void applyInteraction(HWND hwnd){auto style=GetWindowLongPtrW(hwnd,GWL_EXSTYLE);auto wanted=g_interactive?(style&~WS_EX_TRANSPARENT):(style|WS_EX_TRANSPARENT);if(wanted!=style)SetWindowLongPtrW(hwnd,GWL_EXSTYLE,wanted);g_appearance.interactive=g_interactive;}
+void applyOpacity(HWND hwnd){SetLayeredWindowAttributes(hwnd,RGB(0,0,0),static_cast<BYTE>(std::clamp(g_appearance.opacity,.1f,1.f)*255),LWA_COLORKEY|LWA_ALPHA);}
+void resizeWindow(HWND hwnd){RECT r{};GetWindowRect(hwnd,&r);int w=g_appearance.compact?kCompactWidth:kNormalWidth;int h=g_appearance.settingsOpen?kSettingsHeight:(g_appearance.compact?kCompactHeight:kNormalHeight);SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,w,h,SWP_NOACTIVATE);}
+int collapsedHeight(){return g_appearance.compact?kCompactHeight:kNormalHeight;}
+void transitionSettings(HWND hwnd,bool open){RECT r{};GetWindowRect(hwnd,&r);g_settingsClosing=!open;if(open)g_appearance.settingsOpen=true;g_targetHeight=open?kSettingsHeight:collapsedHeight();int width=g_appearance.compact?kCompactWidth:kNormalWidth;SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,width,r.bottom-r.top,SWP_NOACTIVATE);InvalidateRect(hwnd,nullptr,FALSE);}
+void animateSettings(HWND hwnd){if(!g_targetHeight)return;RECT r{};GetWindowRect(hwnd,&r);int current=r.bottom-r.top,difference=g_targetHeight-current;if(abs(difference)<=2){SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,r.right-r.left,g_targetHeight,SWP_NOACTIVATE);g_targetHeight=0;if(g_settingsClosing){g_appearance.settingsOpen=false;g_settingsClosing=false;InvalidateRect(hwnd,nullptr,FALSE);}return;}int magnitude=std::min(abs(difference),std::clamp(abs(difference)/4,4,28));int step=difference<0?-magnitude:magnitude;SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,r.right-r.left,current+step,SWP_NOACTIVATE);}
+void openSettings(HWND hwnd){g_interactive=true;applyInteraction(hwnd);transitionSettings(hwnd,true);ShowWindow(hwnd,SW_SHOWNOACTIVATE);}
+void addTrayIcon(HWND hwnd,HICON icon){g_tray.cbSize=sizeof(g_tray);g_tray.hWnd=hwnd;g_tray.uID=kTrayId;g_tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP|NIF_SHOWTIP;g_tray.uCallbackMessage=kTrayMessage;g_tray.hIcon=icon;lstrcpynW(g_tray.szTip,L"Nihon's Music Framework",_countof(g_tray.szTip));Shell_NotifyIconW(NIM_ADD,&g_tray);g_tray.uVersion=NOTIFYICON_VERSION_4;Shell_NotifyIconW(NIM_SETVERSION,&g_tray);}
+void showTrayMenu(HWND hwnd){HMENU menu=CreatePopupMenu();AppendMenuW(menu,MF_STRING,kMenuSettings,L"Open settings");AppendMenuW(menu,MF_STRING,kMenuToggle,g_interactive?L"Disable interaction":L"Enable interaction");AppendMenuW(menu,MF_SEPARATOR,0,nullptr);AppendMenuW(menu,MF_STRING,kMenuExit,L"Exit");POINT point{};GetCursorPos(&point);SetForegroundWindow(hwnd);TrackPopupMenu(menu,TPM_RIGHTBUTTON|TPM_BOTTOMALIGN|TPM_LEFTALIGN,point.x,point.y,0,hwnd,nullptr);DestroyMenu(menu);PostMessageW(hwnd,WM_NULL,0,0);}
+void rebuild(HWND hwnd,UINT w,UINT h){if(!g_swap||!w||!h)return;g_context->ClearState();g_overlay.reset();if(SUCCEEDED(g_swap->ResizeBuffers(0,w,h,DXGI_FORMAT_UNKNOWN,0))){g_overlay=std::make_unique<mo::IntegrationContext>(mo::Backend::D3D11);g_overlay->initialize({hwnd,g_device.Get(),g_swap.Get(),nullptr});}}
+void scanRecording(){bool any=false;for(int vk=8;vk<255;++vk){if(vk==VK_LBUTTON||vk==VK_RBUTTON||vk==VK_MBUTTON)continue;bool down=(GetAsyncKeyState(vk)&0x8000)!=0;if(down&&!g_scanWasDown[vk]&&std::find(g_recorded.begin(),g_recorded.end(),vk)==g_recorded.end())g_recorded.push_back(vk);g_scanWasDown[vk]=down;if(down)any=true;}if(!any&&!g_recorded.empty()){g_combo=g_recorded;g_recorded.clear();g_recording=false;updateComboName();saveSettings();}}
+void scanToggle(HWND hwnd){bool down=comboDown();if(down&&!g_comboWasDown){ULONGLONG now=GetTickCount64();if(g_lastTap&&now-g_lastTap<=1000){g_interactive=!g_interactive;g_lastTap=0;if(!g_interactive&&g_appearance.settingsOpen)transitionSettings(hwnd,false);applyInteraction(hwnd);}else g_lastTap=now;}g_comboWasDown=down;if(g_lastTap&&GetTickCount64()-g_lastTap>1000)g_lastTap=0;}
+
+LRESULT CALLBACK wndProc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp){switch(msg){
+case WM_COMMAND:switch(LOWORD(wp)){case kMenuSettings:openSettings(hwnd);break;case kMenuToggle:g_interactive=!g_interactive;if(!g_interactive&&g_appearance.settingsOpen)transitionSettings(hwnd,false);applyInteraction(hwnd);InvalidateRect(hwnd,nullptr,FALSE);break;case kMenuExit:DestroyWindow(hwnd);break;}return 0;
+case kTrayMessage:if(LOWORD(lp)==WM_LBUTTONDBLCLK){openSettings(hwnd);return 0;}if(LOWORD(lp)==WM_RBUTTONUP||LOWORD(lp)==WM_CONTEXTMENU){showTrayMenu(hwnd);return 0;}return 0;
+case WM_NCHITTEST:return g_interactive?HTCLIENT:HTTRANSPARENT;
+case WM_TIMER:{if(g_recording)scanRecording();else scanToggle(hwnd);animateSettings(hwnd);ULONGLONG now=GetTickCount64();if(!g_lastMediaPoll||now-g_lastMediaPoll>=250){g_lastMediaPoll=now;g_media.poll();}InvalidateRect(hwnd,nullptr,FALSE);return 0;}
+case WM_SIZE:if(wp!=SIZE_MINIMIZED)rebuild(hwnd,LOWORD(lp),HIWORD(lp));return 0;
+case WM_LBUTTONDOWN:{if(!g_interactive)return 0;int x=GET_X_LPARAM(lp),y=GET_Y_LPARAM(lp);RECT r{};GetClientRect(hwnd,&r);
+ if(y>=50&&y<=90&&x>=r.right-72){transitionSettings(hwnd,!g_appearance.settingsOpen||g_settingsClosing);return 0;}
+ if(g_appearance.settingsOpen&&y>=150&&y<=184&&x>=130){g_appearance.opacity=.1f+.9f*std::clamp(float(x-140)/float(std::max<LONG>(1L,r.right-164)),0.f,1.f);applyOpacity(hwnd);saveSettings();return 0;}
+ if(g_appearance.settingsOpen&&y>=185&&y<=218){g_appearance.compact=!g_appearance.compact;saveSettings();InvalidateRect(hwnd,nullptr,FALSE);return 0;}
+ if(g_appearance.settingsOpen&&y>=218&&y<=252){CHOOSECOLORW cc{sizeof(cc)};static COLORREF custom[16]{};cc.hwndOwner=hwnd;cc.rgbResult=RGB((g_appearance.accentRgb>>16)&255,(g_appearance.accentRgb>>8)&255,g_appearance.accentRgb&255);cc.lpCustColors=custom;cc.Flags=CC_FULLOPEN|CC_RGBINIT;if(ChooseColorW(&cc)){g_appearance.accentRgb=(GetRValue(cc.rgbResult)<<16)|(GetGValue(cc.rgbResult)<<8)|GetBValue(cc.rgbResult);saveSettings();}return 0;}
+ if(g_appearance.settingsOpen&&y>=252&&y<=286){g_appearance.dynamicAccent=!g_appearance.dynamicAccent;saveSettings();return 0;}
+ if(g_appearance.settingsOpen&&y>=286&&y<=320){g_appearance.artworkBackground=!g_appearance.artworkBackground;saveSettings();return 0;}
+ if(g_appearance.settingsOpen&&y>=320&&y<=354){g_recording=true;g_recorded.clear();ZeroMemory(g_scanWasDown,sizeof(g_scanWasDown));updateComboName();return 0;}
+ if(g_appearance.settingsOpen&&y>=354&&y<=390){g_backend=g_backend==9?10:g_backend==10?11:g_backend==11?12:9;updateBackendName();saveSettings();return 0;}
+ ReleaseCapture();SendMessageW(hwnd,WM_NCLBUTTONDOWN,HTCAPTION,0);return 0;}
+case WM_MOUSEMOVE:if(g_interactive&&g_appearance.settingsOpen&&(wp&MK_LBUTTON)){RECT r{};GetClientRect(hwnd,&r);int x=GET_X_LPARAM(lp),y=GET_Y_LPARAM(lp);if(y>=150&&y<=184){g_appearance.opacity=.1f+.9f*std::clamp(float(x-140)/float(std::max<LONG>(1L,r.right-164)),0.f,1.f);applyOpacity(hwnd);InvalidateRect(hwnd,nullptr,FALSE);}}return 0;
+case WM_LBUTTONUP:saveSettings();return 0;
+case WM_PAINT:{PAINTSTRUCT ps;BeginPaint(hwnd,&ps);RECT r;GetClientRect(hwnd,&r);if(g_overlay){g_appearance.logoData=g_bannerData;g_appearance.logoDataSize=g_bannerSize;mo::FrameView f{static_cast<UINT>(r.right),static_cast<UINT>(r.bottom),96.f,g_state.snapshot(),g_appearance};g_overlay->render(f);g_swap->Present(1,0);}EndPaint(hwnd,&ps);return 0;}
+case WM_DESTROY:g_media.stop();saveSettings();Shell_NotifyIconW(NIM_DELETE,&g_tray);PostQuitMessage(0);return 0;}return DefWindowProcW(hwnd,msg,wp,lp);}
+}
+
+int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int){winrt::init_apartment(winrt::apartment_type::multi_threaded);SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);loadSettings();updateBackendName();if(HRSRC resource=FindResourceW(instance,MAKEINTRESOURCEW(IDR_BANNER_PNG),RT_RCDATA)){if(HGLOBAL data=LoadResource(instance,resource)){g_bannerData=static_cast<const std::uint8_t*>(LockResource(data));g_bannerSize=SizeofResource(instance,resource);}}HICON icon=LoadIconW(instance,MAKEINTRESOURCEW(IDI_MUSICOVERLAY));WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.style=CS_HREDRAW|CS_VREDRAW;wc.lpfnWndProc=wndProc;wc.hInstance=instance;wc.hIcon=icon;wc.hIconSm=icon;wc.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));wc.lpszClassName=kClassName;RegisterClassExW(&wc);int width=g_appearance.compact?kCompactWidth:kNormalWidth,height=g_appearance.compact?kCompactHeight:kNormalHeight;HWND hwnd=CreateWindowExW(WS_EX_TOPMOST|WS_EX_TOOLWINDOW|WS_EX_LAYERED|WS_EX_TRANSPARENT|WS_EX_NOACTIVATE,kClassName,L"Nihon's Music Framework",WS_POPUP,GetSystemMetrics(SM_CXSCREEN)-width-28,28,width,height,nullptr,nullptr,instance,nullptr);if(!hwnd||!createDevice(hwnd))return 1;applyOpacity(hwnd);DWM_BLURBEHIND blur{DWM_BB_ENABLE,TRUE,nullptr,TRUE};DwmEnableBlurBehindWindow(hwnd,&blur);MARGINS margins{-1};DwmExtendFrameIntoClientArea(hwnd,&margins);ShowWindow(hwnd,SW_SHOWNOACTIVATE);addTrayIcon(hwnd,icon);SetTimer(hwnd,kTimer,8,nullptr);g_media.start();MSG msg{};while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}return static_cast<int>(msg.wParam);}
