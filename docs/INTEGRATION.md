@@ -24,9 +24,12 @@ frame.height = height;
 frame.dpi = dpi;
 frame.track = currentTrack;
 frame.appearance.opacity = 0.92f;
+frame.appearance.fontFamily = L"Segoe UI Variable Display";
 
 overlay.render(frame); // Call before Present.
 ```
+
+`fontFamily` may name any installed DirectWrite font family. The painter retains automatic fitting for long titles and falls back through DirectWrite when a requested family is unavailable.
 
 The host retains ownership of every pointer in `NativeTarget` and must keep them alive until it destroys the integration context.
 

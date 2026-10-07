@@ -33,11 +33,11 @@ MediaSessionManager ──► OverlayState ──► FrameView
 
 The optional SDL3 host is a separate portable frontend. It selects SDL's OpenGL or Vulkan renderer at runtime and reuses the Windows media-session and source-spectrum services today. Linux platform services are intentionally future work; the native DirectX host and integration ABI remain independent of SDL.
 
-The shared `OverlayPainter` uses Direct2D, DirectWrite, and WIC. It handles text fitting, album-art decoding, rounded artwork clipping, progress interpolation, dynamic accent extraction, settings controls, and embedded branding.
+The shared `OverlayPainter` uses Direct2D, DirectWrite, and WIC. It handles custom-family text fitting, geometry-clipped complementary text, album-art decoding, rounded artwork clipping, progress interpolation, dynamic accent extraction, media controls, and embedded branding.
 
 ## Standalone host
 
-The Win32 application owns the overlay window, D3D11 device and swap chain, notification-area icon, double-tap shortcut state machine, native color dialog, settings persistence, and window animations. It keeps `WS_EX_TRANSPARENT` enabled outside interaction mode.
+The Win32 application owns the overlay window, D3D11 device, DirectComposition swap chain, notification-area icon, 450 ms double-tap shortcut state machine, native color/font dialogs, settings persistence, and the dedicated Direct2D settings window. It keeps `WS_EX_TRANSPARENT` enabled outside interaction mode and enables ordinary input automatically in Windowed Stream Mode.
 
 ## Settings
 
@@ -47,7 +47,7 @@ Settings are stored in:
 %LOCALAPPDATA%\NihonsMusicFramework\settings.ini
 ```
 
-They include opacity, custom accent, compact mode, artwork mode, dynamic accent, shortcut virtual-key codes, and renderer preference. Deleting this file restores defaults and triggers the first-run renderer prompt.
+They include opacity, custom accent, installed font family, compact and Windowed Stream modes, artwork mode, dynamic accent, shortcut virtual-key codes, Overkill configuration, Discord RPC configuration, and renderer preference. Deleting this file restores defaults and triggers the first-run renderer prompt.
 
 ## Lifetime and threading
 

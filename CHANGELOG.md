@@ -9,6 +9,33 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
 
+## [1.4.0] - 2026-10-07
+
+### Added
+
+- Windowed Stream Mode for OBS and other broadcast tools, with interactive standard window behavior and a premultiplied-alpha DirectComposition surface for transparent capture
+- Dedicated native Direct2D/DirectWrite settings window inspired by CyberiaStyle Last Approach, while retaining complete notification-area access
+- Icon-only previous, play/pause, next, shuffle, and repeat controls while interaction mode is active
+- GSMTC capability and playback-mode state tracking so unsupported media controls are visibly distinguished and never invoked
+- Installed system-font selection for overlay titles and artist names through the settings window and notification-area menu
+- Persisted overlay font family with Segoe UI Variable Display as the safe default
+
+### Changed
+
+- Reduced the interaction shortcut double-tap window from one second to 450 milliseconds to prevent accidental toggles
+- Windowed Stream Mode now enables interaction automatically
+- Media controls replace the banner while interaction mode is active and keep the progress bar clear of their hit targets
+- Inactive media controls use a higher-contrast treatment for readability
+- Text covered by artwork or spectrum geometry receives a complementary-color pass, including an inverted Chroma gradient, while unaffected text keeps its normal styling
+- The custom font continues to use automatic text fitting in standard, compact, and Overkill layouts
+
+### Fixed
+
+- Preserved true transparency in OBS Window Capture instead of exposing a black composition background
+- Corrected Windowed Stream Mode hit testing so mouse input no longer passes through the player
+- Corrected the dedicated settings window title encoding
+- Kept the overlay inside monitor bounds when mode or window dimensions change
+
 ## [1.3.2] - 2026-10-07
 
 ### Stashed fix

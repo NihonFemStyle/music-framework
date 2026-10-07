@@ -12,8 +12,19 @@ bool OverlayPainter::initialize()
   if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic_)))) return false;
   if (FAILED(write_->CreateTextFormat(L"Segoe UI Variable Display", nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD,
   DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 22.0f, L"", &title_))) return false;
-  return SUCCEEDED(write_->CreateTextFormat(L"Segoe UI Variable Text", nullptr, DWRITE_FONT_WEIGHT_NORMAL,
-  DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 14.0f, L"", &detail_));
+  if(FAILED(write_->CreateTextFormat(L"Segoe UI Variable Text", nullptr, DWRITE_FONT_WEIGHT_NORMAL,
+  DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 14.0f, L"", &detail_)))return false;
+  if(FAILED(write_->CreateTextFormat(L"Segoe MDL2 Assets",nullptr,DWRITE_FONT_WEIGHT_NORMAL,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,17.f,L"",&controls_)))return false;
+  controls_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);controls_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);return true;
+  }
+
+  void OverlayPainter::drawControls(ID2D1RenderTarget* rt,const TrackInfo& track,float width,float height,ID2D1Brush* accent)
+  {
+    constexpr float button=28.f,gap=5.f;const float total=button*5+gap*4,left=std::max(8.f,width-total-14.f),top=std::max(8.f,height-38.f);
+    const wchar_t* glyphs[]{L"\uE892",track.playing?L"\uE769":L"\uE768",L"\uE893",L"\uE8B1",L"\uE8EE"};
+    const bool enabled[]{track.canPrevious,track.canPlayPause,track.canNext,track.canShuffle,track.canRepeat};const bool active[]{false,track.playing,false,track.shuffleActive,track.repeatMode!=0};
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> background,normal,disabled;rt->CreateSolidColorBrush(D2D1::ColorF(0x071412,.72f),&background);rt->CreateSolidColorBrush(D2D1::ColorF(0xF4F7FB),&normal);rt->CreateSolidColorBrush(D2D1::ColorF(0xB9C3CD,.88f),&disabled);
+    for(int i=0;i<5;++i){float x=left+i*(button+gap);auto box=D2D1::RoundedRect(D2D1::RectF(x,top,x+button,top+button),5,5);rt->FillRoundedRectangle(box,background.Get());rt->DrawRoundedRectangle(box,active[i]?accent:(enabled[i]?normal.Get():disabled.Get()),active[i]?2.f:1.f);rt->DrawTextW(glyphs[i],1,controls_.Get(),box.rect,active[i]?accent:(enabled[i]?normal.Get():disabled.Get()));if(i==4&&track.repeatMode==1){const wchar_t* one=L"1";rt->DrawTextW(one,1,detail_.Get(),D2D1::RectF(x+17,top+13,x+27,top+27),accent);}}
   }
 
   bool OverlayPainter::decodeBitmap(ID2D1RenderTarget* rt, IWICBitmapSource* source, ID2D1Bitmap** output,
@@ -49,10 +60,10 @@ bool OverlayPainter::initialize()
       float width=std::max(1.f,box.right-box.left),height=std::max(1.f,box.bottom-box.top),size=maximum;
       Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
       Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
-      write_->CreateTextFormat(L"Segoe UI Variable Display",nullptr,weight,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,size,L"",&format);
+      write_->CreateTextFormat(textFontFamily_.c_str(),nullptr,weight,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,size,L"",&format);
       write_->CreateTextLayout(text.c_str(),static_cast<UINT32>(text.size()),format.Get(),width,height,&layout);
       DWRITE_TEXT_METRICS metrics{}; if(layout)layout->GetMetrics(&metrics);
-      if(metrics.widthIncludingTrailingWhitespace>width||metrics.height>height){float scale=std::min(width/std::max(1.f,metrics.widthIncludingTrailingWhitespace),height/std::max(1.f,metrics.height));size=std::max(minimum,size*scale);format.Reset();layout.Reset();write_->CreateTextFormat(L"Segoe UI Variable Display",nullptr,weight,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,size,L"",&format);write_->CreateTextLayout(text.c_str(),static_cast<UINT32>(text.size()),format.Get(),width,height,&layout);}
+      if(metrics.widthIncludingTrailingWhitespace>width||metrics.height>height){float scale=std::min(width/std::max(1.f,metrics.widthIncludingTrailingWhitespace),height/std::max(1.f,metrics.height));size=std::max(minimum,size*scale);format.Reset();layout.Reset();write_->CreateTextFormat(textFontFamily_.c_str(),nullptr,weight,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,size,L"",&format);write_->CreateTextLayout(text.c_str(),static_cast<UINT32>(text.size()),format.Get(),width,height,&layout);}
       if(layout)rt->DrawTextLayout(D2D1::Point2F(box.left,box.top),layout.Get(),brush,D2D1_DRAW_TEXT_OPTIONS_CLIP);
       }
 
@@ -107,18 +118,18 @@ bool OverlayPainter::initialize()
               return result;
               }
 
-              void OverlayPainter::drawSpectrum(ID2D1RenderTarget* rt,ID2D1Bitmap* artwork,const Appearance& a,
-              const std::array<float,64>& spectrum,float w,float h,std::uint32_t accentColor)
+              Microsoft::WRL::ComPtr<ID2D1Geometry> OverlayPainter::createSpectrumMask(ID2D1RenderTarget* rt,const Appearance& a,
+              const std::array<float,64>& spectrum,float w,float h)
               {
                 const std::size_t count=std::clamp<std::size_t>(a.spectrumBars,8,64);const float maxHeight=std::max(8.f,h*std::clamp(a.spectrumMaxHeight,10u,100u)/100.f);
                 std::vector<D2D1_POINT_2F> points;points.reserve(count);
                 for(std::size_t i=0;i<count;++i){const std::size_t source=count==1?0:(i*63)/(count-1);float level=std::clamp(spectrum[source],0.f,1.f);float barHeight=4.f+level*std::max(0.f,maxHeight-4.f);float x=count==1?w*.5f:float(i)*w/float(count-1);float y=a.corner<2?barHeight:h-barHeight;points.push_back(D2D1::Point2F(x,y));}
 
-                Microsoft::WRL::ComPtr<ID2D1Factory> factory;rt->GetFactory(factory.ReleaseAndGetAddressOf());if(!factory)return;
+                Microsoft::WRL::ComPtr<ID2D1Factory> factory;rt->GetFactory(factory.ReleaseAndGetAddressOf());if(!factory)return {};
                 Microsoft::WRL::ComPtr<ID2D1Geometry> mask;
                 if(a.spectrumCurves)
                 {
-                  Microsoft::WRL::ComPtr<ID2D1PathGeometry> path;Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;if(FAILED(factory->CreatePathGeometry(&path))||FAILED(path->Open(&sink)))return;
+                  Microsoft::WRL::ComPtr<ID2D1PathGeometry> path;Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;if(FAILED(factory->CreatePathGeometry(&path))||FAILED(path->Open(&sink)))return {};
                   const float anchor=a.corner<2?0.f:h;if(a.corner==0||a.corner==2)points.back().y=anchor;else points.front().y=anchor;sink->BeginFigure(D2D1::Point2F(0,anchor),D2D1_FIGURE_BEGIN_FILLED);sink->AddLine(points.front());
                   for(std::size_t i=0;i+1<points.size();++i){const auto p0=points[i?i-1:i],p1=points[i],p2=points[i+1],p3=points[i+2<points.size()?i+2:i+1];sink->AddBezier(D2D1::BezierSegment(D2D1::Point2F(p1.x+(p2.x-p0.x)/6.f,p1.y+(p2.y-p0.y)/6.f),D2D1::Point2F(p2.x-(p3.x-p1.x)/6.f,p2.y-(p3.y-p1.y)/6.f),p2));}
                   sink->AddLine(D2D1::Point2F(w,anchor));sink->EndFigure(D2D1_FIGURE_END_CLOSED);sink->Close();mask=path;
@@ -126,8 +137,15 @@ bool OverlayPainter::initialize()
                   {
                     std::vector<Microsoft::WRL::ComPtr<ID2D1Geometry>> owned;std::vector<ID2D1Geometry*> raw;owned.reserve(count);raw.reserve(count);const float cell=w/float(count),gap=std::max(1.f,cell*.12f);
                     for(std::size_t i=0;i<count;++i){float level=std::clamp(spectrum[(i*63)/std::max<std::size_t>(1,count-1)],0.f,1.f);float barHeight=4.f+level*std::max(0.f,maxHeight-4.f);float top=a.corner<2?0.f:h-barHeight,bottom=a.corner<2?barHeight:h;Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> bar;factory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(D2D1::RectF(float(i)*cell+gap*.5f,top,float(i+1)*cell-gap*.5f,bottom),3,3),&bar);raw.push_back(bar.Get());owned.push_back(bar);}
-                    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> group;if(FAILED(factory->CreateGeometryGroup(D2D1_FILL_MODE_WINDING,raw.data(),static_cast<UINT32>(raw.size()),&group)))return;mask=group;
+                    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> group;if(FAILED(factory->CreateGeometryGroup(D2D1_FILL_MODE_WINDING,raw.data(),static_cast<UINT32>(raw.size()),&group)))return {};mask=group;
                     }
+                    return mask;
+              }
+
+              void OverlayPainter::drawSpectrum(ID2D1RenderTarget* rt,ID2D1Bitmap* artwork,const Appearance& a,
+              const std::array<float,64>& spectrum,float w,float h,std::uint32_t accentColor)
+              {
+                    auto mask=createSpectrumMask(rt,a,spectrum,w,h);if(!mask)return;
 
                     Microsoft::WRL::ComPtr<ID2D1Brush> fillBrush;Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> accentBrush;Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> chromaBrush;
                     if(a.spectrumChroma&&!a.artworkSpectrum)
@@ -146,6 +164,7 @@ bool OverlayPainter::initialize()
             void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame)
             {
               const auto& t = frame.track; const auto& a = frame.appearance;
+              textFontFamily_=a.fontFamily&&*a.fontFamily?a.fontFamily:L"Segoe UI Variable Display";
               float w = static_cast<float>(frame.width), h = static_cast<float>(frame.height);
               SYSTEMTIME localTime{};
               GetLocalTime(&localTime);
@@ -154,13 +173,14 @@ bool OverlayPainter::initialize()
               ID2D1Bitmap* displayedArtwork = aprilFools || !opaqueArtwork_ ? artwork_.Get() : opaqueArtwork_.Get();
               updateLogo(rt, a);
               std::uint32_t accentColor=a.dynamicAccent?artworkAccent_:a.accentRgb;
-              Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel, primary, secondary, accent, artworkBacking;
+              Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel, primary, secondary, accent, artworkBacking, artworkInverse;
               // Overall opacity is applied once by the layered Win32 host.
               rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, 1.f), &panel);
               rt->CreateSolidColorBrush(D2D1::ColorF(0xF4F7FB, 1.f), &primary);
               rt->CreateSolidColorBrush(D2D1::ColorF(0xAAB4C3, 1.f), &secondary);
               rt->CreateSolidColorBrush(D2D1::ColorF(accentColor, 1.f), &accent);
               rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, 1.f), &artworkBacking);
+              rt->CreateSolidColorBrush(D2D1::ColorF((~artworkAccent_)&0x00ffffff,1.f),&artworkInverse);
               auto box = D2D1::RoundedRect(D2D1::RectF(0, 0, w, h), 18, 18);
               if(!a.overkill||a.settingsOpen)rt->FillRoundedRectangle(box, panel.Get());
               if((!a.overkill||a.settingsOpen)&&a.artworkBackground&&displayedArtwork)
@@ -183,8 +203,26 @@ bool OverlayPainter::initialize()
                     float textLeft = 22.f;
                     if(a.overkill&&!a.settingsOpen)
                     {
-                      drawSpectrum(rt,displayedArtwork,a,delayedSpectrum(frame.spectrum,a.spectrumDelayMs),w,h,accentColor);
-                      const bool showArtworkTile=displayedArtwork&&!a.artworkSpectrum;if(showArtworkTile){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(displayedArtwork,artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}float overkillLeft=showArtworkTile?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":titleForDisplay(t.title,a.ignoreParenthetical);std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
+                      const auto spectrum=delayedSpectrum(frame.spectrum,a.spectrumDelayMs);
+                      drawSpectrum(rt,displayedArtwork,a,spectrum,w,h,accentColor);
+                      const bool showArtworkTile=displayedArtwork&&!a.artworkSpectrum;
+                      if(showArtworkTile){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(displayedArtwork,artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}
+                      float overkillLeft=showArtworkTile?140.f:22.f;
+                      std::wstring overkillTitle=t.title.empty()?L"Nothing playing":titleForDisplay(t.title,a.ignoreParenthetical);
+                      std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;
+                      const auto titleBox=D2D1::RectF(overkillLeft,18,w-22,78);const auto artistBox=D2D1::RectF(overkillLeft,82,w-22,112);
+                      drawFittedText(rt,overkillTitle,titleBox,28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);
+                      drawFittedText(rt,overkillArtist,artistBox,16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);
+                      auto textMask=createSpectrumMask(rt,a,spectrum,w,h);
+                      Microsoft::WRL::ComPtr<ID2D1Brush> inverseBrush;Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> inverseSolid;Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> inverseChroma;
+                      if(a.spectrumChroma&&!a.artworkSpectrum)
+                      {
+                        D2D1_GRADIENT_STOP stops[7]{};const float shift=float((GetTickCount64()*a.spectrumHueSpeed/1000)%360);
+                        for(UINT i=0;i<7;++i){float hue=std::fmod(shift+float(i)*60.f,360.f),x=1.f-std::abs(std::fmod(hue/60.f,2.f)-1.f);float r{},g{},b{};if(hue<60){r=1;g=x;}else if(hue<120){r=x;g=1;}else if(hue<180){g=1;b=x;}else if(hue<240){g=x;b=1;}else if(hue<300){r=x;b=1;}else{r=1;b=x;}stops[i]={float(i)/6.f,D2D1::ColorF(1-r,1-g,1-b,1.f)};}
+                        Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;if(SUCCEEDED(rt->CreateGradientStopCollection(stops,7,&collection)))rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(0,0),D2D1::Point2F(w,0)),collection.Get(),&inverseChroma);inverseBrush=inverseChroma;
+                      }else{const auto source=a.artworkSpectrum?artworkAccent_:accentColor;rt->CreateSolidColorBrush(D2D1::ColorF((~source)&0x00ffffff,1.f),&inverseSolid);inverseBrush=inverseSolid;}
+                      if(textMask&&inverseBrush){Microsoft::WRL::ComPtr<ID2D1Layer> textLayer;rt->CreateLayer(nullptr,&textLayer);rt->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(),textMask.Get()),textLayer.Get());drawFittedText(rt,overkillTitle,titleBox,28,13,inverseBrush.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,artistBox,16,10,inverseBrush.Get(),DWRITE_FONT_WEIGHT_NORMAL);rt->PopLayer();}
+                      if(a.showBanner&&!a.interactive&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);if(a.interactive)drawControls(rt,t,w,h,accent.Get());return;
                       }
                       if (displayedArtwork&&!a.artworkBackground)
                       {
@@ -196,9 +234,9 @@ bool OverlayPainter::initialize()
                         }
                         std::wstring title = t.title.empty() ? L"Nothing playing" : titleForDisplay(t.title,a.ignoreParenthetical);
                         std::wstring artist = t.artist.empty() ? L"Windows media session" : t.artist;
-                        drawFittedText(rt,title,D2D1::RectF(textLeft,15,w-158,a.compact?55.f:51.f),22,11,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);
-                        if (!a.compact) drawFittedText(rt,artist,D2D1::RectF(textLeft,53,w-125,79),14,9,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);
-                        if (a.showBanner&&logo_) rt->DrawBitmap(logo_.Get(), D2D1::RectF(w-148, 12, w-18, 56), .85f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                        drawFittedText(rt,title,D2D1::RectF(textLeft,15,w-158,a.compact?55.f:51.f),22,11,a.artworkBackground?artworkInverse.Get():primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);
+                        if (!a.compact) drawFittedText(rt,artist,D2D1::RectF(textLeft,53,w-125,79),14,9,a.artworkBackground?artworkInverse.Get():secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);
+                        if (a.showBanner&&!a.interactive&&logo_) rt->DrawBitmap(logo_.Get(), D2D1::RectF(w-148, 12, w-18, 56), .85f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
                         std::uint64_t now=GetTickCount64();
                         if(progressRevision_!=t.revision)
                         {
@@ -214,9 +252,10 @@ bool OverlayPainter::initialize()
                           }
                           float ratio=progressSample_;if(t.playing&&t.duration100ns>0)ratio+=float(double(now-progressSampleTick_)*10000.0/double(t.duration100ns));ratio=std::clamp(ratio,0.f,1.f);
                           float elapsed=progressFrameTick_?float(now-progressFrameTick_)/1000.f:0.f;progressFrameTick_=now;float blend=1.f-std::exp(-24.f*elapsed);progressSmooth_+=std::clamp(blend,0.f,1.f)*(ratio-progressSmooth_);ratio=progressSmooth_;
-                          float progressY=a.compact?62.f:94.f;
+                          float progressY=a.interactive?h-6.f:(a.compact?62.f:94.f);
                           rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(textLeft,progressY,w-22,progressY+5),3,3),secondary.Get());
                           rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(textLeft,progressY,textLeft+(w-textLeft-22)*ratio,progressY+5),3,3),accent.Get());
+                          if(a.interactive)drawControls(rt,t,w,h,accent.Get());
                           if (a.settingsOpen)
                           {
                             rt->DrawLine(D2D1::Point2F(18,108),D2D1::Point2F(w-18,108),secondary.Get(),1);

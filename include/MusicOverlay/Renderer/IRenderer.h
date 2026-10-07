@@ -32,6 +32,7 @@ struct Appearance {
   const std::uint8_t* logoData{};
   std::uint32_t logoDataSize{};
   const wchar_t* activationKeyName{L"Shift"};
+  const wchar_t* fontFamily{L"Segoe UI Variable Display"};
   const wchar_t* backendName{L"DirectX 11"};
   const wchar_t* cornerName{L"Top right"};
 };

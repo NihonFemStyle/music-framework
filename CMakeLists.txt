@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(NihonsMusicFramework VERSION 1.3.2 LANGUAGES C CXX)
+project(NihonsMusicFramework VERSION 1.4.0 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -112,6 +112,8 @@ if(MUSICOVERLAY_BUILD_STANDALONE)
   else()
     add_executable(musicoverlay_app WIN32
       src/Standalone/WinMain.cpp
+      src/Standalone/SettingsWindow.cpp
+      src/Standalone/SettingsWindow.h
       src/Platform/Windows/DiscordRpc.cpp
       src/Platform/Windows/DiscordRpc.h
       src/Standalone/MusicOverlay.rc
@@ -119,7 +121,7 @@ if(MUSICOVERLAY_BUILD_STANDALONE)
       src/Standalone/resource.h)
     target_include_directories(musicoverlay_app PRIVATE src)
     target_compile_definitions(musicoverlay_app PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-    target_link_libraries(musicoverlay_app PRIVATE musicoverlay user32 dwmapi shell32 comdlg32 comctl32)
+    target_link_libraries(musicoverlay_app PRIVATE musicoverlay user32 dwmapi dcomp shell32 comdlg32 comctl32)
     if(MSVC)
       set_property(TARGET musicoverlay_app PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:DebugDLL>")
     endif()

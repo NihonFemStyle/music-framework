@@ -33,6 +33,10 @@ winrt::Windows::Foundation::IAsyncAction MediaSessionManager::start()
         track.album = props.AlbumTitle().c_str();
         auto playback = session.GetPlaybackInfo();
         track.playing = playback.PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
+        auto controls=playback.Controls();
+        track.canPrevious=controls.IsPreviousEnabled();track.canPlayPause=controls.IsPlayEnabled()||controls.IsPauseEnabled();track.canNext=controls.IsNextEnabled();track.canShuffle=controls.IsShuffleEnabled();track.canRepeat=controls.IsRepeatEnabled();
+        if(auto shuffle=playback.IsShuffleActive())track.shuffleActive=shuffle.Value();
+        if(auto repeat=playback.AutoRepeatMode())track.repeatMode=repeat.Value()==Windows::Media::MediaPlaybackAutoRepeatMode::Track?1:repeat.Value()==Windows::Media::MediaPlaybackAutoRepeatMode::List?2:0;
         auto timeline = session.GetTimelineProperties();
         track.position100ns = timeline.Position().count();
         track.duration100ns = (timeline.EndTime() - timeline.StartTime()).count();
@@ -52,4 +56,23 @@ winrt::Windows::Foundation::IAsyncAction MediaSessionManager::start()
             track.revision = state_.snapshot().revision + 1;
             state_.update(std::move(track));
             }
+
+void MediaSessionManager::previous(){execute(Command::Previous);}void MediaSessionManager::togglePlayPause(){execute(Command::PlayPause);}void MediaSessionManager::next(){execute(Command::Next);}void MediaSessionManager::toggleShuffle(){execute(Command::Shuffle);}void MediaSessionManager::cycleRepeat(){execute(Command::Repeat);}
+
+winrt::fire_and_forget MediaSessionManager::execute(Command command)
+{
+  try
+  {
+    if(!manager_||stopped_)co_return;auto session=manager_.GetCurrentSession();if(!session)co_return;auto playback=session.GetPlaybackInfo();auto controls=playback.Controls();
+    switch(command)
+    {
+      case Command::Previous:if(controls.IsPreviousEnabled())co_await session.TrySkipPreviousAsync();break;
+      case Command::PlayPause:if(playback.PlaybackStatus()==GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing){if(controls.IsPauseEnabled())co_await session.TryPauseAsync();}else if(controls.IsPlayEnabled())co_await session.TryPlayAsync();break;
+      case Command::Next:if(controls.IsNextEnabled())co_await session.TrySkipNextAsync();break;
+      case Command::Shuffle:if(controls.IsShuffleEnabled()){bool active=false;if(auto value=playback.IsShuffleActive())active=value.Value();co_await session.TryChangeShuffleActiveAsync(!active);}break;
+      case Command::Repeat:if(controls.IsRepeatEnabled()){auto mode=Windows::Media::MediaPlaybackAutoRepeatMode::None;if(auto value=playback.AutoRepeatMode())mode=value.Value();auto nextMode=mode==Windows::Media::MediaPlaybackAutoRepeatMode::None?Windows::Media::MediaPlaybackAutoRepeatMode::List:mode==Windows::Media::MediaPlaybackAutoRepeatMode::List?Windows::Media::MediaPlaybackAutoRepeatMode::Track:Windows::Media::MediaPlaybackAutoRepeatMode::None;co_await session.TryChangeAutoRepeatModeAsync(nextMode);}break;
+    }
+    co_await refresh();
+  }catch(...){ }
+}
             }

@@ -13,6 +13,13 @@ struct TrackInfo {
   std::int64_t position100ns{};
   std::int64_t duration100ns{};
   bool playing{};
+  bool canPrevious{};
+  bool canPlayPause{};
+  bool canNext{};
+  bool canShuffle{};
+  bool canRepeat{};
+  bool shuffleActive{};
+  std::uint8_t repeatMode{};
   std::uint64_t revision{};
 };
 }

@@ -24,9 +24,13 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 - Smooth, extrapolated progress between Windows media updates
 - Always-on-top, click-through Win32 overlay
 - Configurable double-tap shortcut for entering and leaving interaction mode
+- Native icon controls for previous, play/pause, next, shuffle, and repeat while interactive
 - Draggable overlay while interactive
-- Compact layout, 10–100% opacity, native color picker, and dynamic artwork-derived accent
+- Compact layout, Windowed Stream Mode, 10–100% opacity, native color picker, and dynamic artwork-derived accent
+- Dedicated native settings window plus complete notification-area configuration
+- Installed system-font selection with automatic title and artist fitting
 - Artwork tile or rounded, aspect-correct background mode
+- Region-aware complementary text rendering over artwork, spectra, and Chroma
 - DWM backdrop blur where supported
 - Native Direct2D, DirectWrite, and WIC rendering
 - Tray icon for settings, interaction control, and clean exit
@@ -51,6 +55,9 @@ Nihon's Music Framework reads the active Windows media session, renders a native
   </tr>
   <tr>
     <td colspan="2" align="center"><strong>Overkill — source-responsive spectrum</strong><br><img src="docs/images/overkill-mode.png" alt="Overkill mode with album artwork, track metadata, and audio spectrum"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><strong>Overkill — custom font and artwork spectrum</strong><br><img src="docs/images/overkill-custom-font.png" alt="Overkill mode using a custom installed font and artwork spectrum"></td>
   </tr>
 </table>
 
@@ -88,19 +95,22 @@ The first launch asks for a renderer preference. The current standalone host ren
 
 ## Using the overlay
 
-The overlay starts in click-through mode. Double-tap the configured shortcut within one second to enter or leave interaction mode. The default shortcut is **Shift**.
+The overlay starts in click-through mode. Double-tap the configured shortcut within 450 milliseconds to enter or leave interaction mode. The default shortcut is **Shift**.
 
 While interactive:
 
 - Drag unused space to reposition the standard and compact overlays.
-- Open settings from the tray icon; the player no longer carries a settings button.
-- Choose opacity, compact layout, a custom accent, dynamic accent, artwork-background mode, Overkill mode, whether the branded banner is shown, and whether parenthetical title suffixes are hidden.
+- Use the icon-only previous, play/pause, next, shuffle, and repeat controls. Controls unavailable for the current media session remain visible but muted.
+- Open the dedicated settings window from the tray icon; the player carries no settings button.
+- Choose opacity, compact layout, a custom accent, dynamic accent, artwork-background mode, Overkill mode, installed text font, banner visibility, and parenthetical-title handling.
 - Select the shortcut row, press any valid keyboard combination, then release it to save.
 - Use the renderer row to save a preferred API for a future restart.
 
-The settings panel animates open and closed. Leaving interaction mode closes it automatically.
+Windowed Stream Mode turns the overlay into a normal interactive window suitable for OBS Window Capture. Its composition surface preserves per-pixel transparency instead of producing a black capture background.
 
-The tray icon provides the complete settings surface directly: transparency presets, compact mode, accent controls, artwork mode, shortcut recording, renderer selection, Overkill controls, banner visibility, parenthetical-title handling, interaction mode, and exit. Options with multiple choices use nested submenus. Double-clicking the tray icon still opens the animated settings panel.
+The tray icon provides the complete settings surface directly: transparency presets, compact and Windowed Stream modes, accent and font pickers, artwork mode, shortcut recording, renderer selection, Overkill controls, banner visibility, parenthetical-title handling, interaction mode, Discord Rich Presence, and exit. Options with multiple choices use nested submenus. Double-clicking the tray icon opens the dedicated native settings window.
+
+Text keeps its normal styling where the panel is unobstructed. Portions covered by artwork or spectrum geometry receive a complementary-color pass; Chroma uses the corresponding inverted gradient. This preserves readability without applying a blanket outline or changing unaffected glyph regions.
 
 ### Metadata formatting
 
