@@ -72,22 +72,25 @@ void OverlayPainter::updateArtwork(ID2D1RenderTarget* rt, const TrackInfo& t) {
 void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
   const auto& t = frame.track; const auto& a = frame.appearance;
   float w = static_cast<float>(frame.width), h = static_cast<float>(frame.height);
+  SYSTEMTIME localTime{};
+  GetLocalTime(&localTime);
+  const bool aprilFools = localTime.wMonth == 4 && localTime.wDay == 1;
   updateArtwork(rt, t);
   updateLogo(rt, a);
   std::uint32_t accentColor=a.dynamicAccent?artworkAccent_:a.accentRgb;
-  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel, primary, secondary, accent;
+  Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel, primary, secondary, accent, artworkBacking;
   rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, a.opacity), &panel);
   rt->CreateSolidColorBrush(D2D1::ColorF(0xF4F7FB, 1.f), &primary);
   rt->CreateSolidColorBrush(D2D1::ColorF(0xAAB4C3, 1.f), &secondary);
   rt->CreateSolidColorBrush(D2D1::ColorF(accentColor, 1.f), &accent);
+  rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, 1.f), &artworkBacking);
   auto box = D2D1::RoundedRect(D2D1::RectF(0, 0, w, h), 18, 18);
   if(!a.overkill||a.settingsOpen)rt->FillRoundedRectangle(box, panel.Get());
   if((!a.overkill||a.settingsOpen)&&a.artworkBackground&&artwork_){
     float backgroundHeight=a.settingsOpen?108.f:h;
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory;Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> clipGeometry;Microsoft::WRL::ComPtr<ID2D1Layer> clipLayer;
     rt->GetFactory(d2dFactory.ReleaseAndGetAddressOf());d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(D2D1::RectF(0,0,w,backgroundHeight),18,18),clipGeometry.ReleaseAndGetAddressOf());rt->CreateLayer(nullptr,clipLayer.ReleaseAndGetAddressOf());rt->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(),clipGeometry.Get()),clipLayer.Get());
-    SYSTEMTIME now{};GetLocalTime(&now);
-    if(now.wMonth==4&&now.wDay==1){
+    if(aprilFools){
       // Intentionally cursed stretch, preserved as an April Fools' Day easter egg.
       rt->DrawBitmap(artwork_.Get(),D2D1::RectF(0,0,w,backgroundHeight),.22f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     }else{
@@ -100,11 +103,13 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
   float textLeft = 22.f;
   if(a.overkill&&!a.settingsOpen){
     float barWidth=w/32.f;for(std::size_t i=0;i<frame.spectrum.size();++i){float level=std::clamp(frame.spectrum[i],0.f,1.f);float barHeight=4.f+level*(h-4.f);Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> spectrumBrush;rt->CreateSolidColorBrush(D2D1::ColorF(accentColor,.22f+.68f*level),&spectrumBrush);float left=float(i)*barWidth;float right=float(i+1)*barWidth-1.f;float top=a.corner<2?0.f:h-barHeight;float bottom=a.corner<2?barHeight:h;rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(left,top,right,bottom),3,3),spectrumBrush.Get());}
-    if(artwork_)rt->DrawBitmap(artwork_.Get(),D2D1::RectF(16,14,122,120),1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);float overkillLeft=artwork_?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":t.title;std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
+    if(artwork_){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(artwork_.Get(),artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}float overkillLeft=artwork_?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":t.title;std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
   }
   if (artwork_&&!a.artworkBackground) {
     float artBottom = a.compact ? 66.f : 94.f;
-    rt->DrawBitmap(artwork_.Get(), D2D1::RectF(12, 10, 12+(artBottom-10), artBottom), 1.f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    const auto artRect = D2D1::RectF(12, 10, 12+(artBottom-10), artBottom);
+    if(!aprilFools) rt->FillRectangle(artRect, artworkBacking.Get());
+    rt->DrawBitmap(artwork_.Get(), artRect, 1.f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     textLeft = 18+(artBottom-10);
   }
   std::wstring title = t.title.empty() ? L"Nothing playing" : t.title;

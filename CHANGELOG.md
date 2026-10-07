@@ -9,6 +9,16 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
 
+## [1.2.1] - 2026-10-06
+
+### Fixed
+
+- Made transparent album-art pixels render against an opaque backing in tile and Overkill modes
+
+### Easter eggs
+
+- Preserved transparent album artwork without its backing on April Fools' Day
+
 ## [1.2.0] - 2026-10-06
 
 ### Added
