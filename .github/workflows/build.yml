@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
@@ -17,6 +17,12 @@ jobs:
         architecture: [x64]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Visual Studio 2022
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,18.0)'
+          msbuild-architecture: x64
 
       - name: Configure
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.architecture }}
