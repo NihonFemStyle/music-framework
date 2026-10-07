@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [standard, nocrt]
+        mode: [standard, nocrt, sdl]
         architecture: [x64, Win32, ARM64]
         configuration: [Debug, Release, RelWithDebInfo, MinSizeRel]
     steps:
@@ -62,6 +62,17 @@ jobs:
         if: matrix.mode == 'nocrt'
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.architecture }} -DMUSICOVERLAY_NOCRT=ON -DMUSICOVERLAY_BUILD_INTEGRATION=OFF
 
+      - name: Cache SDL dependencies
+        if: matrix.mode == 'sdl'
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: sdl-3.4.16-${{ runner.os }}-${{ matrix.architecture }}
+
+      - name: Configure SDL build
+        if: matrix.mode == 'sdl'
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.architecture }} -DMUSICOVERLAY_BUILD_SDL_FRONTEND=ON
+
       - name: Build
         run: cmake --build build --config ${{ matrix.configuration }} --parallel
 
@@ -76,7 +87,8 @@ jobs:
           $packageName = "Nihons-Music-Framework-v$version-$mode-$architecture-$configuration"
           $packageDirectory = Join-Path $env:RUNNER_TEMP $packageName
           New-Item -ItemType Directory -Force -Path $packageDirectory | Out-Null
-          Copy-Item -LiteralPath (Join-Path $binaryDirectory "musicoverlay_app.exe") -Destination $packageDirectory
+          $executable = if ($mode -eq "sdl") { "musicoverlay_sdl.exe" } else { "musicoverlay_app.exe" }
+          Copy-Item -LiteralPath (Join-Path $binaryDirectory $executable) -Destination $packageDirectory
           if ($mode -eq "standard") {
             Copy-Item -LiteralPath (Join-Path $binaryDirectory "musicoverlay.lib") -Destination $packageDirectory
             Copy-Item -LiteralPath "include" -Destination $packageDirectory -Recurse

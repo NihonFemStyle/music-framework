@@ -34,6 +34,7 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 - Persistent settings under `%LOCALAPPDATA%\NihonsMusicFramework\settings.ini`
 - Embedded banner, application icon, and Release runtime dependencies
 - Renderer abstraction for Direct3D 9, 10, 11, and 12 integration
+- Optional SDL3 frontend with selectable OpenGL and Vulkan rendering
 - Explicitly constrained experimental no-CRT build path
 
 ## Preview
@@ -98,7 +99,7 @@ While interactive:
 
 The settings panel animates open and closed. Leaving interaction mode closes it automatically.
 
-The tray icon provides **Open settings**, **Enable/disable interaction**, and **Exit**. Double-clicking it opens settings.
+The tray icon provides the complete settings surface directly: transparency presets, compact mode, accent controls, artwork mode, shortcut recording, renderer selection, Overkill controls, banner visibility, interaction mode, and exit. Options with multiple choices use nested submenus. Double-clicking the tray icon still opens the animated settings panel.
 
 ### Metadata formatting
 
@@ -136,8 +137,16 @@ Every push to `main`, nightly schedule, or manual dispatch builds downloadable c
 | Direct3D 10 | Yes | Direct2D/DirectWrite | No | Host supplies device and swap chain. |
 | Direct3D 11 | Yes | Direct2D/DirectWrite/WIC | **Yes** | Full standalone experience. |
 | Direct3D 12 | Binding validation | Host-rendered | No | Host owns command recording, resource states, and synchronization. |
+| OpenGL | SDL3 renderer | Portable draw path | Optional | Compatibility-oriented standalone frontend. |
+| Vulkan | SDL3 renderer | Portable draw path | Optional | Modern standalone frontend. |
 
 The abstraction intentionally does not inject unsafe D3D12 commands into an unknown host command list. See [Integration](docs/INTEGRATION.md).
+
+### SDL3 frontend
+
+The optional `musicoverlay_sdl` application is a Windows-first preview of the portable frontend. Build it with `.\build.ps1 -SDL`, then select `--renderer opengl` for compatibility or `--renderer vulkan` for the modern path. It does not replace the native DirectX application, and it is excluded from no-CRT builds.
+
+Linux is a planned future feature. The intended Linux platform layer will use MPRIS for media sessions and PipeWire for audio capture, with compositor-dependent X11/Wayland overlay behavior. macOS is not supported.
 
 ## Repository layout
 

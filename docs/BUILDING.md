@@ -21,6 +21,7 @@ Parameters:
 | `-Configuration` | `Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel` | `Release` |
 | `-Architecture` | `x64`, `Win32`, `ARM64` | `x64` |
 | `-NoCRT` | Enables the experimental constrained no-CRT executable | Off |
+| `-SDL` | Builds the optional SDL3 OpenGL/Vulkan frontend | Off |
 | `-Clean` | Removes the selected build tree before configuring | Off |
 | `-Jobs` | Parallel build-job count | Logical processor count |
 
@@ -31,6 +32,7 @@ Examples:
 .\build.ps1 -Architecture ARM64 -Configuration Release
 .\build.ps1 -Clean
 .\build.ps1 -NoCRT
+.\build.ps1 -SDL
 ```
 
 Output follows this pattern:
@@ -53,6 +55,17 @@ Useful options:
 | `MUSICOVERLAY_BUILD_STANDALONE` | `ON` | Builds the desktop overlay. |
 | `MUSICOVERLAY_BUILD_INTEGRATION` | `ON` | Exposes the integration interface target. |
 | `MUSICOVERLAY_NOCRT` | `OFF` | Builds the minimal custom-entry-point executable. |
+| `MUSICOVERLAY_BUILD_SDL_FRONTEND` | `OFF` | Builds `musicoverlay_sdl` with OpenGL and Vulkan runtime selection. |
+| `MUSICOVERLAY_FETCH_SDL` | `ON` | Fetches the pinned SDL3 release when it is not installed. |
+
+Run the portable frontend with one of these renderer selections:
+
+```powershell
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer opengl
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer vulkan
+```
+
+The SDL frontend is currently Windows-first. Linux support, including MPRIS, PipeWire, Wayland/X11 behavior, and desktop integration, is planned for a future release.
 
 ## Runtime and resources
 

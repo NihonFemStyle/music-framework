@@ -7,6 +7,7 @@ param(
     [string]$Architecture = 'x64',
 
     [switch]$NoCRT,
+    [switch]$SDL,
     [switch]$Clean,
 
     [ValidateRange(1, 128)]
@@ -15,7 +16,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
-$buildSuffix = if ($NoCRT) { 'nocrt' } else { 'default' }
+$buildSuffix = if ($NoCRT) { 'nocrt' } elseif ($SDL) { 'sdl' } else { 'default' }
 $buildDirectory = Join-Path $projectRoot "build-$Architecture-$buildSuffix"
 
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
@@ -33,6 +34,7 @@ $configureArguments = @(
     '-G', 'Visual Studio 17 2022',
     '-A', $Architecture,
     "-DMUSICOVERLAY_NOCRT=$($NoCRT.IsPresent.ToString().ToUpperInvariant())"
+    "-DMUSICOVERLAY_BUILD_SDL_FRONTEND=$($SDL.IsPresent.ToString().ToUpperInvariant())"
 )
 
 if ($NoCRT) {
@@ -40,7 +42,7 @@ if ($NoCRT) {
     $configureArguments += '-DMUSICOVERLAY_BUILD_INTEGRATION=OFF'
 }
 
-Write-Host "Configuring MusicOverlay ($Architecture, $Configuration, NOCRT=$($NoCRT.IsPresent))"
+Write-Host "Configuring MusicOverlay ($Architecture, $Configuration, NOCRT=$($NoCRT.IsPresent), SDL=$($SDL.IsPresent))"
 & cmake @configureArguments
 if ($LASTEXITCODE -ne 0) {
     throw "CMake configuration failed with exit code $LASTEXITCODE."
@@ -57,4 +59,10 @@ if (Test-Path -LiteralPath $executable) {
     Write-Host "Build complete: $executable" -ForegroundColor Green
 } else {
     Write-Host "Build completed, but the executable was not found at the expected path: $executable" -ForegroundColor Yellow
+}
+if ($SDL) {
+    $sdlExecutable = Join-Path $buildDirectory "$Configuration\musicoverlay_sdl.exe"
+    if (Test-Path -LiteralPath $sdlExecutable) {
+        Write-Host "SDL build complete: $sdlExecutable" -ForegroundColor Green
+    }
 }

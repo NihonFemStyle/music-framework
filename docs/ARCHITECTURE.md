@@ -31,6 +31,8 @@ MediaSessionManager ──► OverlayState ──► FrameView
 
 `IRenderer` accepts a borrowed `NativeTarget` and immutable `FrameView`. The renderer never owns host devices, swap chains, or command queues.
 
+The optional SDL3 host is a separate portable frontend. It selects SDL's OpenGL or Vulkan renderer at runtime and reuses the Windows media-session and source-spectrum services today. Linux platform services are intentionally future work; the native DirectX host and integration ABI remain independent of SDL.
+
 The shared `OverlayPainter` uses Direct2D, DirectWrite, and WIC. It handles text fitting, album-art decoding, rounded artwork clipping, progress interpolation, dynamic accent extraction, settings controls, and embedded branding.
 
 ## Standalone host

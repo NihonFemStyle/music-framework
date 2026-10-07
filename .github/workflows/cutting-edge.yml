@@ -93,3 +93,48 @@ jobs:
             build/${{ matrix.configuration }}/build-info.txt
           if-no-files-found: error
           retention-days: 14
+
+  sdl-configurations:
+    name: SDL ${{ matrix.architecture }} ${{ matrix.configuration }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x64, Win32, ARM64]
+        configuration: [Debug, Release, RelWithDebInfo, MinSizeRel]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Visual Studio 2022
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,18.0)'
+          msbuild-architecture: x64
+
+      - name: Cache SDL dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: sdl-3.4.16-${{ runner.os }}-${{ matrix.architecture }}
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.architecture }} -DMUSICOVERLAY_BUILD_SDL_FRONTEND=ON
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.configuration }} --parallel
+
+      - name: Package metadata
+        shell: pwsh
+        run: |
+          $output = "build/${{ matrix.configuration }}"
+          "commit=${{ github.sha }}`nconfiguration=${{ matrix.configuration }}`narchitecture=${{ matrix.architecture }}`nmode=sdl`nrenderers=opengl,vulkan" | Set-Content "$output/build-info.txt"
+
+      - name: Upload cutting-edge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutting-edge-sdl-${{ matrix.architecture }}-${{ matrix.configuration }}
+          path: |
+            build/${{ matrix.configuration }}/musicoverlay_sdl.exe
+            build/${{ matrix.configuration }}/build-info.txt
+          if-no-files-found: error
+          retention-days: 14
