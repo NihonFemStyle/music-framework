@@ -66,7 +66,7 @@ if(MUSICOVERLAY_BUILD_STANDALONE)
       src/Standalone/MusicOverlay.rc
       src/Standalone/resource.h)
     target_compile_definitions(musicoverlay_app PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE MUSICOVERLAY_NOCRT=1)
-    target_compile_options(musicoverlay_app PRIVATE /GS- /GR- /EHs-c- /Zl)
+    target_compile_options(musicoverlay_app PRIVATE /GS- /GR- /EHs-c- /Zl /Oi-)
     target_link_options(musicoverlay_app PRIVATE /NODEFAULTLIB /ENTRY:WinMainCRTStartup)
     target_link_libraries(musicoverlay_app PRIVATE kernel32 user32 gdi32 d3d11 dxgi)
   else()

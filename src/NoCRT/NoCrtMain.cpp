@@ -3,6 +3,7 @@
 // Minimal compiler-required memory primitives. Optimized MSVC builds may lower
 // aggregate initialization and copies to these symbols even when the source
 // does not call the CRT directly.
+#pragma function(memset, memcpy)
 #pragma optimize("", off)
 extern "C" void* __cdecl memset(void* destination, int value, size_t count) {
   auto* output = static_cast<volatile unsigned char*>(destination);
