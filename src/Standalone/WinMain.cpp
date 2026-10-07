@@ -44,7 +44,11 @@ void updateBackendName(){static const wchar_t* names[]{L"DirectX 9",L"DirectX 10
 void updateCornerName(){static const wchar_t* names[]{L"Top left",L"Top right",L"Bottom left",L"Bottom right"};g_appearance.cornerName=names[std::min<std::uint32_t>(g_appearance.corner,3)];}
 bool createDevice(HWND hwnd){DXGI_SWAP_CHAIN_DESC d{};d.BufferCount=2;d.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;d.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;d.OutputWindow=hwnd;d.SampleDesc.Count=1;d.Windowed=TRUE;d.SwapEffect=DXGI_SWAP_EFFECT_DISCARD;D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0,D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0};if(FAILED(D3D11CreateDeviceAndSwapChain(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,levels,3,D3D11_SDK_VERSION,&d,&g_swap,&g_device,nullptr,&g_context)))return false;g_overlay=std::make_unique<mo::IntegrationContext>(mo::Backend::D3D11);return g_overlay->initialize({hwnd,g_device.Get(),g_swap.Get(),nullptr});}
 void applyInteraction(HWND hwnd){auto style=GetWindowLongPtrW(hwnd,GWL_EXSTYLE);auto wanted=g_interactive?(style&~WS_EX_TRANSPARENT):(style|WS_EX_TRANSPARENT);if(wanted!=style)SetWindowLongPtrW(hwnd,GWL_EXSTYLE,wanted);g_appearance.interactive=g_interactive;}
-void applyOpacity(HWND hwnd){SetLayeredWindowAttributes(hwnd,RGB(0,0,0),static_cast<BYTE>(std::clamp(g_appearance.opacity,.1f,1.f)*255),LWA_COLORKEY|LWA_ALPHA);}
+void applyOpacity(HWND hwnd){
+  // Panel transparency is rendered by Direct2D. Applying LWA_ALPHA here would
+  // make artwork, text, and controls translucent along with the panel.
+  SetLayeredWindowAttributes(hwnd,RGB(1,0,1),255,LWA_COLORKEY);
+}
 int collapsedHeight(){return g_appearance.overkill?kOverkillHeight:(g_appearance.compact?kCompactHeight:kNormalHeight);}
 int collapsedWidth(){return g_appearance.overkill?kOverkillWidth:(g_appearance.compact?kCompactWidth:kNormalWidth);}
 void constrainToMonitor(HWND hwnd){RECT window{};if(!GetWindowRect(hwnd,&window))return;HMONITOR monitor=MonitorFromRect(&window,MONITOR_DEFAULTTONEAREST);MONITORINFO info{sizeof(info)};if(!GetMonitorInfoW(monitor,&info))return;LONG width=window.right-window.left,height=window.bottom-window.top;LONG x=window.left,y=window.top;if(width>=info.rcWork.right-info.rcWork.left)x=info.rcWork.left;else x=std::clamp(x,info.rcWork.left,info.rcWork.right-width);if(height>=info.rcWork.bottom-info.rcWork.top)y=info.rcWork.top;else y=std::clamp(y,info.rcWork.top,info.rcWork.bottom-height);if(x!=window.left||y!=window.top)SetWindowPos(hwnd,nullptr,x,y,0,0,SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE);}

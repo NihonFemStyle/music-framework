@@ -13,11 +13,26 @@ bool OverlayPainter::initialize() {
       DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 14.0f, L"", &detail_));
 }
 
-bool OverlayPainter::decodeBitmap(ID2D1RenderTarget* rt, IWICBitmapSource* source, ID2D1Bitmap** output) {
+bool OverlayPainter::decodeBitmap(ID2D1RenderTarget* rt, IWICBitmapSource* source, ID2D1Bitmap** output,
+    bool forceOpaque) {
   Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
-  return SUCCEEDED(wic_->CreateFormatConverter(&converter)) &&
-    SUCCEEDED(converter->Initialize(source, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0, WICBitmapPaletteTypeCustom)) &&
-    SUCCEEDED(rt->CreateBitmapFromWicBitmap(converter.Get(), nullptr, output));
+  if (FAILED(wic_->CreateFormatConverter(&converter))) return false;
+  const auto format = forceOpaque ? GUID_WICPixelFormat32bppBGRA : GUID_WICPixelFormat32bppPBGRA;
+  if (FAILED(converter->Initialize(source, format, WICBitmapDitherTypeNone, nullptr, 0,
+      WICBitmapPaletteTypeCustom))) return false;
+  if (!forceOpaque) return SUCCEEDED(rt->CreateBitmapFromWicBitmap(converter.Get(), nullptr, output));
+
+  UINT width{}, height{};
+  if (FAILED(converter->GetSize(&width, &height)) || !width || !height || width > UINT_MAX / 4) return false;
+  const UINT stride = width * 4;
+  if (height > SIZE_MAX / stride) return false;
+  std::vector<BYTE> pixels(static_cast<std::size_t>(stride) * height);
+  if (pixels.size() > UINT_MAX) return false;
+  if (FAILED(converter->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data()))) return false;
+  for (std::size_t index = 3; index < pixels.size(); index += 4) pixels[index] = 0xff;
+  const auto properties = D2D1::BitmapProperties(
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+  return SUCCEEDED(rt->CreateBitmap(D2D1::SizeU(width, height), pixels.data(), stride, properties, output));
 }
 
 void OverlayPainter::drawFittedText(ID2D1RenderTarget* rt, const std::wstring& text, D2D1_RECT_F box,
@@ -55,7 +70,7 @@ void OverlayPainter::updateLogo(ID2D1RenderTarget* rt, const Appearance& a) {
 
 void OverlayPainter::updateArtwork(ID2D1RenderTarget* rt, const TrackInfo& t) {
   if (artworkRevision_ == t.revision) return;
-  artworkRevision_ = t.revision; artwork_.Reset();
+  artworkRevision_ = t.revision; artwork_.Reset(); opaqueArtwork_.Reset();
   if (t.artwork.empty() || t.artwork.size() > UINT_MAX) return;
   Microsoft::WRL::ComPtr<IWICStream> stream;
   Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
@@ -65,6 +80,7 @@ void OverlayPainter::updateArtwork(ID2D1RenderTarget* rt, const TrackInfo& t) {
       FAILED(wic_->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder)) ||
       FAILED(decoder->GetFrame(0, &frame))) return;
   decodeBitmap(rt, frame.Get(), artwork_.ReleaseAndGetAddressOf());
+  decodeBitmap(rt, frame.Get(), opaqueArtwork_.ReleaseAndGetAddressOf(), true);
   Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler; Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
   if(SUCCEEDED(wic_->CreateBitmapScaler(&scaler))&&SUCCEEDED(scaler->Initialize(frame.Get(),1,1,WICBitmapInterpolationModeFant))&&SUCCEEDED(wic_->CreateFormatConverter(&converter))&&SUCCEEDED(converter->Initialize(scaler.Get(),GUID_WICPixelFormat32bppRGBA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom))){BYTE pixel[4]{};if(SUCCEEDED(converter->CopyPixels(nullptr,4,4,pixel))){float r=pixel[0],g=pixel[1],b=pixel[2],bright=std::max({r,g,b});if(bright<8.f){artworkAccent_=0x68D5C8;}else{float scale=std::clamp(235.f/bright,1.15f,3.25f);auto vivid=[scale](float channel){return static_cast<std::uint32_t>(std::clamp((channel-24.f)*scale+32.f,32.f,255.f));};artworkAccent_=(vivid(r)<<16)|(vivid(g)<<8)|vivid(b);}}}
 }
@@ -76,6 +92,7 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
   GetLocalTime(&localTime);
   const bool aprilFools = localTime.wMonth == 4 && localTime.wDay == 1;
   updateArtwork(rt, t);
+  ID2D1Bitmap* displayedArtwork = aprilFools || !opaqueArtwork_ ? artwork_.Get() : opaqueArtwork_.Get();
   updateLogo(rt, a);
   std::uint32_t accentColor=a.dynamicAccent?artworkAccent_:a.accentRgb;
   Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel, primary, secondary, accent, artworkBacking;
@@ -86,30 +103,30 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
   rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, 1.f), &artworkBacking);
   auto box = D2D1::RoundedRect(D2D1::RectF(0, 0, w, h), 18, 18);
   if(!a.overkill||a.settingsOpen)rt->FillRoundedRectangle(box, panel.Get());
-  if((!a.overkill||a.settingsOpen)&&a.artworkBackground&&artwork_){
+  if((!a.overkill||a.settingsOpen)&&a.artworkBackground&&displayedArtwork){
     float backgroundHeight=a.settingsOpen?108.f:h;
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory;Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> clipGeometry;Microsoft::WRL::ComPtr<ID2D1Layer> clipLayer;
     rt->GetFactory(d2dFactory.ReleaseAndGetAddressOf());d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(D2D1::RectF(0,0,w,backgroundHeight),18,18),clipGeometry.ReleaseAndGetAddressOf());rt->CreateLayer(nullptr,clipLayer.ReleaseAndGetAddressOf());rt->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(),clipGeometry.Get()),clipLayer.Get());
     if(aprilFools){
       // Intentionally cursed stretch, preserved as an April Fools' Day easter egg.
-      rt->DrawBitmap(artwork_.Get(),D2D1::RectF(0,0,w,backgroundHeight),.22f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+      rt->DrawBitmap(displayedArtwork,D2D1::RectF(0,0,w,backgroundHeight),.22f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     }else{
-      auto size=artwork_->GetSize();float targetAspect=w/backgroundHeight,sourceAspect=size.width/std::max(1.f,size.height);D2D1_RECT_F source{};
+      auto size=displayedArtwork->GetSize();float targetAspect=w/backgroundHeight,sourceAspect=size.width/std::max(1.f,size.height);D2D1_RECT_F source{};
       if(sourceAspect>targetAspect){float croppedWidth=size.height*targetAspect;float left=(size.width-croppedWidth)*.5f;source=D2D1::RectF(left,0,left+croppedWidth,size.height);}else{float croppedHeight=size.width/targetAspect;float top=(size.height-croppedHeight)*.5f;source=D2D1::RectF(0,top,size.width,top+croppedHeight);}
-      rt->DrawBitmap(artwork_.Get(),D2D1::RectF(0,0,w,backgroundHeight),.22f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,source);
+      rt->DrawBitmap(displayedArtwork,D2D1::RectF(0,0,w,backgroundHeight),.22f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,source);
     }
     rt->PopLayer();
   }
   float textLeft = 22.f;
   if(a.overkill&&!a.settingsOpen){
     float barWidth=w/32.f;for(std::size_t i=0;i<frame.spectrum.size();++i){float level=std::clamp(frame.spectrum[i],0.f,1.f);float barHeight=4.f+level*(h-4.f);Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> spectrumBrush;rt->CreateSolidColorBrush(D2D1::ColorF(accentColor,.22f+.68f*level),&spectrumBrush);float left=float(i)*barWidth;float right=float(i+1)*barWidth-1.f;float top=a.corner<2?0.f:h-barHeight;float bottom=a.corner<2?barHeight:h;rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(left,top,right,bottom),3,3),spectrumBrush.Get());}
-    if(artwork_){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(artwork_.Get(),artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}float overkillLeft=artwork_?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":t.title;std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
+    if(displayedArtwork){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(displayedArtwork,artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}float overkillLeft=displayedArtwork?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":t.title;std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
   }
-  if (artwork_&&!a.artworkBackground) {
+  if (displayedArtwork&&!a.artworkBackground) {
     float artBottom = a.compact ? 66.f : 94.f;
     const auto artRect = D2D1::RectF(12, 10, 12+(artBottom-10), artBottom);
     if(!aprilFools) rt->FillRectangle(artRect, artworkBacking.Get());
-    rt->DrawBitmap(artwork_.Get(), artRect, 1.f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    rt->DrawBitmap(displayedArtwork, artRect, 1.f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     textLeft = 18+(artBottom-10);
   }
   std::wstring title = t.title.empty() ? L"Nothing playing" : t.title;

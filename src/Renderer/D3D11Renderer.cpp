@@ -13,6 +13,6 @@ void D3D11Renderer::createTarget() {
   factory_->CreateDxgiSurfaceRenderTarget(surface.Get(), &props, &target_);
 }
 void D3D11Renderer::resize(std::uint32_t,std::uint32_t){ createTarget(); }
-void D3D11Renderer::render(const FrameView& f){ if(!target_)createTarget(); if(!target_)return; target_->BeginDraw(); target_->Clear(D2D1::ColorF(0,0.f)); painter_.paint(target_.Get(),f); if(target_->EndDraw()==D2DERR_RECREATE_TARGET)target_.Reset(); }
+void D3D11Renderer::render(const FrameView& f){ if(!target_)createTarget(); if(!target_)return; target_->BeginDraw(); target_->Clear(D2D1::ColorF(1.f/255.f,0.f,1.f/255.f,1.f)); painter_.paint(target_.Get(),f); if(target_->EndDraw()==D2DERR_RECREATE_TARGET)target_.Reset(); }
 }
 
