@@ -47,6 +47,9 @@ Nihon's Music Framework reads the active Windows media session, renders a native
     <td align="center"><strong>Compact — artwork background</strong><br><img src="docs/images/compact-artwork-background.png" alt="Compact overlay with artwork background"></td>
     <td align="center"><strong>Compact — artwork tile</strong><br><img src="docs/images/compact-artwork-tile.png" alt="Compact overlay with artwork tile"></td>
   </tr>
+  <tr>
+    <td colspan="2" align="center"><strong>Overkill — source-responsive spectrum</strong><br><img src="docs/images/overkill-mode.png" alt="Overkill mode with album artwork, track metadata, and audio spectrum"></td>
+  </tr>
 </table>
 
 ## Requirements
