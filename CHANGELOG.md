@@ -9,6 +9,17 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
 
+## [1.3.1] - 2026-10-07
+
+### Fixed
+
+- Replaced the Discord IPC invalid-handle constant with a portable null disconnected state so MSVC Release builds compile correctly
+- Corrected the Chroma rate unit to display as `°/s` during normal operation
+
+### Easter eggs
+
+- Preserved the malformed `Â°/s` Chroma rate label exclusively for April Fools' Day while using the correct `°/s` label normally
+
 ## [1.3.0] - 2026-10-07
 
 ### Added

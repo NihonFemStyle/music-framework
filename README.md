@@ -114,7 +114,7 @@ The tray settings expose 16–64 bars or curve points, response speed, display d
 
 The spectrum uses Windows process-loopback capture for the application that owns the active media session. It deliberately does not fall back to system-wide capture, so unrelated applications are not visualized. Some protected-content players and media applications whose session cannot be mapped to a process may therefore show an idle spectrum.
 
-> On April 1, artwork-background mode intentionally stretches the artwork. This is a feature of questionable artistic merit.
+> On April 1, artwork-background mode intentionally stretches the artwork and the Chroma rate unit develops a suspicious extra `Â`. These are features of questionable artistic merit.
 
 ### Discord Rich Presence
 
