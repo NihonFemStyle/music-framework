@@ -32,8 +32,12 @@ if(NOT MUSICOVERLAY_NOCRT OR MUSICOVERLAY_BUILD_INTEGRATION)
 add_library(musicoverlay STATIC
   ${MO_PUBLIC_HEADERS}
   src/Core/OverlayState.cpp
+  src/Core/MetadataFormatter.cpp
+  src/Core/MetadataFormatter.h
   src/Platform/Windows/MediaSessionManager.cpp
   src/Platform/Windows/MediaSessionManager.h
+  src/Platform/Windows/ProcessSpectrumCapture.cpp
+  src/Platform/Windows/ProcessSpectrumCapture.h
   src/Renderer/RendererFactory.cpp
   src/Renderer/D3D9Renderer.cpp
   src/Renderer/D3D10Renderer.cpp
@@ -51,7 +55,7 @@ target_include_directories(musicoverlay
     src)
 target_compile_features(musicoverlay PUBLIC cxx_std_20)
 target_compile_definitions(musicoverlay PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-target_link_libraries(musicoverlay PUBLIC d3d9 d3d10 d3d11 d3d12 dxgi d2d1 dwrite windowscodecs runtimeobject)
+target_link_libraries(musicoverlay PUBLIC d3d9 d3d10 d3d11 d3d12 dxgi d2d1 dwrite windowscodecs runtimeobject mmdevapi)
 
 if(MSVC)
   target_compile_options(musicoverlay PRIVATE /W4 /permissive- /EHsc /Zc:__cplusplus)

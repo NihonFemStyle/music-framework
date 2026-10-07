@@ -1,4 +1,5 @@
 #include "MediaSessionManager.h"
+#include "Core/MetadataFormatter.h"
 #include <winrt/Windows.Storage.Streams.h>
 
 using namespace winrt;
@@ -20,6 +21,7 @@ winrt::Windows::Foundation::IAsyncAction MediaSessionManager::refresh() {
   TrackInfo track;
   if (session) {
     try {
+      track.sourceAppId = session.SourceAppUserModelId().c_str();
       auto props = co_await session.TryGetMediaPropertiesAsync();
       track.title = props.Title().c_str();
       track.artist = props.Artist().c_str();
@@ -40,6 +42,7 @@ winrt::Windows::Foundation::IAsyncAction MediaSessionManager::refresh() {
       }
     } catch (...) { }
   }
+  formatTrackMetadata(track);
   track.revision = state_.snapshot().revision + 1;
   state_.update(std::move(track));
 }

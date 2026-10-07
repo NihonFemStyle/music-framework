@@ -81,8 +81,8 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
   rt->CreateSolidColorBrush(D2D1::ColorF(0xAAB4C3, 1.f), &secondary);
   rt->CreateSolidColorBrush(D2D1::ColorF(accentColor, 1.f), &accent);
   auto box = D2D1::RoundedRect(D2D1::RectF(0, 0, w, h), 18, 18);
-  rt->FillRoundedRectangle(box, panel.Get());
-  if(a.artworkBackground&&artwork_){
+  if(!a.overkill||a.settingsOpen)rt->FillRoundedRectangle(box, panel.Get());
+  if((!a.overkill||a.settingsOpen)&&a.artworkBackground&&artwork_){
     float backgroundHeight=a.settingsOpen?108.f:h;
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory;Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> clipGeometry;Microsoft::WRL::ComPtr<ID2D1Layer> clipLayer;
     rt->GetFactory(d2dFactory.ReleaseAndGetAddressOf());d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(D2D1::RectF(0,0,w,backgroundHeight),18,18),clipGeometry.ReleaseAndGetAddressOf());rt->CreateLayer(nullptr,clipLayer.ReleaseAndGetAddressOf());rt->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(),clipGeometry.Get()),clipLayer.Get());
@@ -98,6 +98,10 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
     rt->PopLayer();
   }
   float textLeft = 22.f;
+  if(a.overkill&&!a.settingsOpen){
+    float barWidth=w/32.f;for(std::size_t i=0;i<frame.spectrum.size();++i){float level=std::clamp(frame.spectrum[i],0.f,1.f);float barHeight=4.f+level*(h-4.f);Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> spectrumBrush;rt->CreateSolidColorBrush(D2D1::ColorF(accentColor,.22f+.68f*level),&spectrumBrush);float left=float(i)*barWidth;float right=float(i+1)*barWidth-1.f;float top=a.corner<2?0.f:h-barHeight;float bottom=a.corner<2?barHeight:h;rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(left,top,right,bottom),3,3),spectrumBrush.Get());}
+    if(artwork_)rt->DrawBitmap(artwork_.Get(),D2D1::RectF(16,14,122,120),1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);float overkillLeft=artwork_?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":t.title;std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
+  }
   if (artwork_&&!a.artworkBackground) {
     float artBottom = a.compact ? 66.f : 94.f;
     rt->DrawBitmap(artwork_.Get(), D2D1::RectF(12, 10, 12+(artBottom-10), artBottom), 1.f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
@@ -107,10 +111,7 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
   std::wstring artist = t.artist.empty() ? L"Windows media session" : t.artist;
   drawFittedText(rt,title,D2D1::RectF(textLeft,15,w-158,a.compact?55.f:51.f),22,11,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);
   if (!a.compact) drawFittedText(rt,artist,D2D1::RectF(textLeft,53,w-125,79),14,9,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);
-  if (logo_) rt->DrawBitmap(logo_.Get(), D2D1::RectF(w-148, 12, w-18, 56), .85f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-  if (a.interactive) {
-    auto c=D2D1::Point2F(w-36,70);rt->DrawEllipse(D2D1::Ellipse(c,8,8),accent.Get(),2);rt->FillEllipse(D2D1::Ellipse(c,3,3),accent.Get());for(int i=0;i<8;++i){float dx=(i%2?0.707f:1.f)*(i>=3&&i<=6?-1.f:1.f);float dy=(i==0||i==4?0.f:(i<4?1.f:-1.f));rt->DrawLine(D2D1::Point2F(c.x+dx*9,c.y+dy*9),D2D1::Point2F(c.x+dx*13,c.y+dy*13),accent.Get(),2);}
-  }
+  if (a.showBanner&&logo_) rt->DrawBitmap(logo_.Get(), D2D1::RectF(w-148, 12, w-18, 56), .85f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
   std::uint64_t now=GetTickCount64();
   if(progressRevision_!=t.revision){
     float sample=t.duration100ns>0?std::clamp(float(double(t.position100ns)/double(t.duration100ns)),0.f,1.f):0.f;
@@ -144,6 +145,9 @@ void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame) {
     const wchar_t* keyLabel=L"Double-tap shortcut";rt->DrawTextW(keyLabel,19,detail_.Get(),D2D1::RectF(20,325,180,348),primary.Get());
     const wchar_t* keyName=a.activationKeyName?a.activationKeyName:L"Shift";rt->DrawTextW(keyName,static_cast<UINT32>(wcslen(keyName)),detail_.Get(),D2D1::RectF(w-160,325,w-22,348),accent.Get());
     const wchar_t* renderer=L"Renderer (restart)";rt->DrawTextW(renderer,18,detail_.Get(),D2D1::RectF(20,359,180,382),primary.Get());const wchar_t* backend=a.backendName?a.backendName:L"DirectX 11";rt->DrawTextW(backend,static_cast<UINT32>(wcslen(backend)),detail_.Get(),D2D1::RectF(w-130,359,w-22,382),accent.Get());
+    const wchar_t* overkill=L"Overkill mode";rt->DrawTextW(overkill,13,detail_.Get(),D2D1::RectF(20,393,180,416),primary.Get());rt->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(w-70,393,w-24,415),11,11),accent.Get(),2);if(a.overkill)rt->FillEllipse(D2D1::Ellipse(D2D1::Point2F(w-36,404),7,7),accent.Get());
+    const wchar_t* corner=L"Overkill corner";rt->DrawTextW(corner,15,detail_.Get(),D2D1::RectF(20,427,180,450),primary.Get());const wchar_t* cornerName=a.cornerName?a.cornerName:L"Top right";rt->DrawTextW(cornerName,static_cast<UINT32>(wcslen(cornerName)),detail_.Get(),D2D1::RectF(w-140,427,w-22,450),accent.Get());
+    const wchar_t* banner=L"Show banner";rt->DrawTextW(banner,11,detail_.Get(),D2D1::RectF(20,461,180,484),primary.Get());rt->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(w-70,461,w-24,483),11,11),accent.Get(),2);if(a.showBanner)rt->FillEllipse(D2D1::Ellipse(D2D1::Point2F(w-36,472),7,7),accent.Get());
   }
 }
 }

@@ -8,6 +8,7 @@ struct TrackInfo {
   std::wstring title;
   std::wstring artist;
   std::wstring album;
+  std::wstring sourceAppId;
   std::vector<std::uint8_t> artwork;
   std::int64_t position100ns{};
   std::int64_t duration100ns{};

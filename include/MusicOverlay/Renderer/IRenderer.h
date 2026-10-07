@@ -1,6 +1,7 @@
 #pragma once
 #include <MusicOverlay/Core/TrackInfo.h>
 #include <cstdint>
+#include <array>
 #include <memory>
 
 namespace mo {
@@ -14,13 +15,17 @@ struct Appearance {
   bool interactive{};
   bool artworkBackground{};
   bool dynamicAccent{};
+  bool overkill{};
+  bool showBanner{true};
+  std::uint32_t corner{};
   const wchar_t* logoPath{};
   const std::uint8_t* logoData{};
   std::uint32_t logoDataSize{};
   const wchar_t* activationKeyName{L"Shift"};
   const wchar_t* backendName{L"DirectX 11"};
+  const wchar_t* cornerName{L"Top right"};
 };
-struct FrameView { std::uint32_t width{}; std::uint32_t height{}; float dpi{96.0f}; TrackInfo track; Appearance appearance; };
+struct FrameView { std::uint32_t width{}; std::uint32_t height{}; float dpi{96.0f}; TrackInfo track; Appearance appearance; std::array<float,32> spectrum{}; };
 class IRenderer {
 public:
   virtual ~IRenderer() = default;

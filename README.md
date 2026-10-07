@@ -20,6 +20,7 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 
 - Windows media discovery through Global System Media Transport Controls and C++/WinRT
 - Title, artist, album, playback state, timeline, and album artwork
+- Metadata cleanup that moves featured performers to the artist line and places version/remix suffixes on a new title line
 - Smooth, extrapolated progress between Windows media updates
 - Always-on-top, click-through Win32 overlay
 - Configurable double-tap shortcut for entering and leaving interaction mode
@@ -29,6 +30,7 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 - DWM backdrop blur where supported
 - Native Direct2D, DirectWrite, and WIC rendering
 - Tray icon for settings, interaction control, and clean exit
+- Optional corner-locked Overkill layout with a source-isolated, real-time audio spectrum
 - Persistent settings under `%LOCALAPPDATA%\NihonsMusicFramework\settings.ini`
 - Embedded banner, application icon, and Release runtime dependencies
 - Renderer abstraction for Direct3D 9, 10, 11, and 12 integration
@@ -50,6 +52,7 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 ## Requirements
 
 - Windows 10 or Windows 11
+- Overkill spectrum capture requires Windows 10 build 20348 or newer
 - Visual Studio 2022 with **Desktop development with C++**
 - Windows 10/11 SDK
 - CMake 3.24 or newer
@@ -84,15 +87,25 @@ The overlay starts in click-through mode. Double-tap the configured shortcut wit
 
 While interactive:
 
-- Drag unused space to reposition the overlay.
-- Select the gear icon to open settings.
-- Choose opacity, compact layout, a custom accent, dynamic accent, or artwork-background mode.
+- Drag unused space to reposition the standard and compact overlays.
+- Open settings from the tray icon; the player no longer carries a settings button.
+- Choose opacity, compact layout, a custom accent, dynamic accent, artwork-background mode, Overkill mode, and whether the branded banner is shown.
 - Select the shortcut row, press any valid keyboard combination, then release it to save.
 - Use the renderer row to save a preferred API for a future restart.
 
 The settings panel animates open and closed. Leaving interaction mode closes it automatically.
 
 The tray icon provides **Open settings**, **Enable/disable interaction**, and **Exit**. Double-clicking it opens settings.
+
+### Metadata formatting
+
+Common featured-performer markers such as `feat.`, `featuring`, and `ft.` are removed from the title and appended to the artist line. Title separators such as ` - `, en/em dashes, and ` | ` become line breaks so version names, VIP mixes, and remix labels remain readable without forcing the player wider.
+
+### Overkill mode
+
+Overkill mode adds a 32-band spectrum visualizer around a larger album-art and metadata layout. It can be assigned to any screen corner and is locked there instead of being freely dragged. When the foreground application occupies an entire monitor, the overlay uses that monitor's full bounds rather than its taskbar work area.
+
+The spectrum uses Windows process-loopback capture for the application that owns the active media session. It deliberately does not fall back to system-wide capture, so unrelated applications are not visualized. Some protected-content players and media applications whose session cannot be mapped to a process may therefore show an idle spectrum.
 
 > On April 1, artwork-background mode intentionally stretches the artwork. This is a feature of questionable artistic merit.
 
@@ -143,6 +156,7 @@ docs/                       Design, build, integration, and no-CRT guides
 - [Architecture](docs/ARCHITECTURE.md)
 - [Integration guide](docs/INTEGRATION.md)
 - [No-CRT scope and limitations](docs/NOCRT.md)
+- [Publishing releases](docs/RELEASING.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
@@ -153,6 +167,7 @@ docs/                       Design, build, integration, and no-CRT guides
 - D3D9 UI support is intentionally limited.
 - D3D12 requires a host-specific command-list and synchronization contract.
 - Media availability and metadata quality depend on the source application's GSMTC implementation.
+- Source-isolated spectrum capture is best effort and may be unavailable for protected audio or media sessions that Windows cannot map back to a process.
 - The no-CRT executable is a minimal experiment and does not include the full overlay feature set.
 
 ## License
