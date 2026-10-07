@@ -8,6 +8,9 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - A complete D3D12 command-recording contract
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
+- Restarted Overkill spectrum capture when the active audio-session process changes or capture fails
+- Removed chroma-key outlines from Overkill text and spectrum bars while preserving opaque black artwork
+- Moved parenthetical title suffixes onto new lines and added a persisted option to hide them
 
 ## [1.2.2] - 2026-10-06
 

@@ -93,13 +93,13 @@ While interactive:
 
 - Drag unused space to reposition the standard and compact overlays.
 - Open settings from the tray icon; the player no longer carries a settings button.
-- Choose opacity, compact layout, a custom accent, dynamic accent, artwork-background mode, Overkill mode, and whether the branded banner is shown.
+- Choose opacity, compact layout, a custom accent, dynamic accent, artwork-background mode, Overkill mode, whether the branded banner is shown, and whether parenthetical title suffixes are hidden.
 - Select the shortcut row, press any valid keyboard combination, then release it to save.
 - Use the renderer row to save a preferred API for a future restart.
 
 The settings panel animates open and closed. Leaving interaction mode closes it automatically.
 
-The tray icon provides the complete settings surface directly: transparency presets, compact mode, accent controls, artwork mode, shortcut recording, renderer selection, Overkill controls, banner visibility, interaction mode, and exit. Options with multiple choices use nested submenus. Double-clicking the tray icon still opens the animated settings panel.
+The tray icon provides the complete settings surface directly: transparency presets, compact mode, accent controls, artwork mode, shortcut recording, renderer selection, Overkill controls, banner visibility, parenthetical-title handling, interaction mode, and exit. Options with multiple choices use nested submenus. Double-clicking the tray icon still opens the animated settings panel.
 
 ### Metadata formatting
 

@@ -4,19 +4,20 @@
 #include <dwrite.h>
 #include <wincodec.h>
 #include <wrl/client.h>
-
-namespace mo {
-class OverlayPainter {
-public:
+namespace mo
+{
+class OverlayPainter
+{
+  public:
   bool initialize();
   void paint(ID2D1RenderTarget* target, const FrameView& frame);
-private:
+  private:
   void updateArtwork(ID2D1RenderTarget* target, const TrackInfo& track);
   void updateLogo(ID2D1RenderTarget* target, const Appearance& appearance);
   bool decodeBitmap(ID2D1RenderTarget* target, IWICBitmapSource* source, ID2D1Bitmap** output,
-                    bool forceOpaque = false);
+  bool forceOpaque = false);
   void drawFittedText(ID2D1RenderTarget* target, const std::wstring& text, D2D1_RECT_F box,
-                      float maximumSize, float minimumSize, ID2D1Brush* brush, DWRITE_FONT_WEIGHT weight);
+  float maximumSize, float minimumSize, ID2D1Brush* brush, DWRITE_FONT_WEIGHT weight);
   Microsoft::WRL::ComPtr<IDWriteFactory> write_;
   Microsoft::WRL::ComPtr<IWICImagingFactory> wic_;
   Microsoft::WRL::ComPtr<IDWriteTextFormat> title_;
@@ -35,6 +36,5 @@ private:
   std::wstring progressTitle_;
   std::wstring logoPath_;
   const std::uint8_t* logoData_{};
-};
-}
-
+  };
+  }

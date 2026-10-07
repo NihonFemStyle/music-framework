@@ -5,23 +5,28 @@
 #include <cstdint>
 #include <string>
 #include <thread>
-
-namespace mo::win {
-class ProcessSpectrumCapture {
-public:
+namespace mo::win
+{
+class ProcessSpectrumCapture
+{
+  public:
   static constexpr std::size_t BandCount=32;
   ProcessSpectrumCapture()=default;
   ~ProcessSpectrumCapture(){stop();}
   ProcessSpectrumCapture(const ProcessSpectrumCapture&)=delete;
   ProcessSpectrumCapture& operator=(const ProcessSpectrumCapture&)=delete;
   bool startForApp(const std::wstring& appId);
+  bool ensureForApp(const std::wstring& appId);
   void stop();
   [[nodiscard]] std::array<float,BandCount> snapshot() const;
   [[nodiscard]] const std::wstring& activeAppId() const noexcept{return appId_;}
-private:
+  private:
+  bool startForProcess(const std::wstring& appId,std::uint32_t processId);
   void captureLoop();
   std::wstring appId_;
+  std::uint32_t processId_{};
   std::atomic_bool stopping_{};
+  std::atomic_bool captureFailed_{};
   std::array<std::atomic<float>,BandCount> bands_{};
   void* audioClient_{};
   void* captureClient_{};
@@ -30,5 +35,5 @@ private:
   std::uint32_t sampleRate_{};
   std::uint16_t channels_{};
   bool floatSamples_{};
-};
-}
+  };
+  }

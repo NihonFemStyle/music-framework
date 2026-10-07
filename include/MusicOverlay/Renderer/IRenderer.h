@@ -17,6 +17,7 @@ struct Appearance {
   bool dynamicAccent{};
   bool overkill{};
   bool showBanner{true};
+  bool ignoreParenthetical{};
   std::uint32_t corner{};
   const wchar_t* logoPath{};
   const std::uint8_t* logoData{};
