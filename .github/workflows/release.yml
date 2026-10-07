@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Read release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: version
+        name: Validate VERSION
+        shell: bash
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "VERSION must contain a release version such as 1.0 or 1.0.1" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.mode }} ${{ matrix.architecture }} ${{ matrix.configuration }}
+    needs: version
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [standard, nocrt]
+        architecture: [x64, Win32, ARM64]
+        configuration: [Debug, Release, RelWithDebInfo, MinSizeRel]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Visual Studio 2022
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0,18.0)'
+          msbuild-architecture: x64
+
+      - name: Configure standard build
+        if: matrix.mode == 'standard'
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.architecture }} -DMUSICOVERLAY_NOCRT=OFF
+
+      - name: Configure no-CRT build
+        if: matrix.mode == 'nocrt'
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.architecture }} -DMUSICOVERLAY_NOCRT=ON -DMUSICOVERLAY_BUILD_INTEGRATION=OFF
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.configuration }} --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ needs.version.outputs.version }}"
+          $mode = "${{ matrix.mode }}"
+          $architecture = "${{ matrix.architecture }}"
+          $configuration = "${{ matrix.configuration }}"
+          $binaryDirectory = Join-Path "build" $configuration
+          $packageName = "Nihons-Music-Framework-v$version-$mode-$architecture-$configuration"
+          $packageDirectory = Join-Path $env:RUNNER_TEMP $packageName
+          New-Item -ItemType Directory -Force -Path $packageDirectory | Out-Null
+          Copy-Item -LiteralPath (Join-Path $binaryDirectory "musicoverlay_app.exe") -Destination $packageDirectory
+          if ($mode -eq "standard") {
+            Copy-Item -LiteralPath (Join-Path $binaryDirectory "musicoverlay.lib") -Destination $packageDirectory
+            Copy-Item -LiteralPath "include" -Destination $packageDirectory -Recurse
+          }
+          Copy-Item -LiteralPath "README.md","LICENSE","CHANGELOG.md" -Destination $packageDirectory
+          @"
+          version=$version
+          tag=${{ needs.version.outputs.tag }}
+          commit=${{ github.sha }}
+          mode=$mode
+          architecture=$architecture
+          configuration=$configuration
+          "@ | Set-Content (Join-Path $packageDirectory "build-info.txt")
+          Compress-Archive -Path $packageDirectory -DestinationPath "$packageName.zip" -CompressionLevel Optimal
+
+      - name: Upload package for release job
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-${{ matrix.mode }}-${{ matrix.architecture }}-${{ matrix.configuration }}
+          path: Nihons-Music-Framework-v${{ needs.version.outputs.version }}-${{ matrix.mode }}-${{ matrix.architecture }}-${{ matrix.configuration }}.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all release packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-package-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Nihon's Music Framework ${{ needs.version.outputs.tag }}
+          body_path: CHANGELOG.md
+          files: release-assets/*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          make_latest: true
+          prerelease: false
+
