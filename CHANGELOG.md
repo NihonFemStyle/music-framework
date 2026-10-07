@@ -9,6 +9,12 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
 
+## [1.4.1] - 2026-10-07
+
+### Fixed
+
+- Restored cross-process click-through with a layered, transparent Win32 overlay style; leaving Windowed Stream Mode now reapplies it immediately
+
 ## [1.4.0] - 2026-10-07
 
 ### Added

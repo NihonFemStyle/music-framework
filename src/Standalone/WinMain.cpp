@@ -49,7 +49,7 @@ NOTIFYICONDATAW g_tray{};
 int g_targetHeight{};bool g_settingsClosing{};
 mo::win::ProcessSpectrumCapture g_spectrum;ULONGLONG g_lastSpectrumCheck{};
 mo::win::DiscordRpc g_discordRpc;mo::win::DiscordRpcSettings g_discordSettings;
-mo::standalone::SettingsWindow g_settingsWindow;bool g_windowedMode{};
+mo::standalone::SettingsWindow g_settingsWindow;bool g_windowedMode{},g_appliedWindowedMode{};
 
 std::wstring keyName(int vk){wchar_t name[64]{};UINT scan=MapVirtualKeyW(vk,MAPVK_VK_TO_VSC)<<16;if(vk==VK_LEFT||vk==VK_UP||vk==VK_RIGHT||vk==VK_DOWN||vk==VK_RCONTROL||vk==VK_RMENU)scan|=1<<24;if(GetKeyNameTextW(static_cast<LONG>(scan),name,64)>0)return name;wchar_t fallback[16]{};wsprintfW(fallback,L"VK %02X",vk);return fallback;}
 void updateComboName(){g_comboName.clear();for(size_t i=0;i<g_combo.size();++i){if(i)g_comboName+=L" + ";g_comboName+=keyName(g_combo[i]);}g_appearance.activationKeyName=g_recording?L"Press keys...":g_comboName.c_str();}
@@ -73,7 +73,7 @@ bool createDevice(HWND hwnd)
   if(FAILED(DCompositionCreateDevice(dxgiDevice.Get(),IID_PPV_ARGS(&g_composition)))||FAILED(g_composition->CreateTargetForHwnd(hwnd,TRUE,&g_compositionTarget))||FAILED(g_composition->CreateVisual(&g_compositionVisual))||FAILED(g_composition->CreateEffectGroup(&g_compositionEffects))||FAILED(g_compositionVisual->SetEffect(g_compositionEffects.Get()))||FAILED(g_compositionVisual->SetContent(g_swap.Get()))||FAILED(g_compositionTarget->SetRoot(g_compositionVisual.Get()))||FAILED(g_composition->Commit()))return false;
   g_overlay=std::make_unique<mo::IntegrationContext>(mo::Backend::D3D11);return g_overlay->initialize({hwnd,g_device.Get(),g_swap.Get(),nullptr});
 }
-void applyInteraction(HWND hwnd){auto style=GetWindowLongPtrW(hwnd,GWL_EXSTYLE);const bool interactive=g_windowedMode||g_interactive;auto wanted=interactive?(style&~WS_EX_TRANSPARENT):(style|WS_EX_TRANSPARENT);if(wanted!=style)SetWindowLongPtrW(hwnd,GWL_EXSTYLE,wanted);g_appearance.interactive=interactive;}
+void applyInteraction(HWND hwnd){auto style=GetWindowLongPtrW(hwnd,GWL_EXSTYLE);const bool interactive=g_windowedMode||g_interactive;auto wanted=style;if(g_windowedMode)wanted&=~(WS_EX_TRANSPARENT|WS_EX_LAYERED);else{wanted|=WS_EX_LAYERED;if(interactive)wanted&=~WS_EX_TRANSPARENT;else wanted|=WS_EX_TRANSPARENT;}if(wanted!=style){SetWindowLongPtrW(hwnd,GWL_EXSTYLE,wanted);if(!g_windowedMode)SetLayeredWindowAttributes(hwnd,0,255,LWA_ALPHA);SetWindowPos(hwnd,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);}g_appearance.interactive=interactive;}
 void applyOpacity(HWND hwnd)
 {
   (void)hwnd;if(g_compositionEffects&&g_composition){g_compositionEffects->SetOpacity(std::clamp(g_appearance.opacity,.1f,1.f));g_composition->Commit();}
@@ -87,6 +87,7 @@ void applyOpacity(HWND hwnd)
   void animateSettings(HWND hwnd){if(!g_targetHeight)return;RECT r{};GetWindowRect(hwnd,&r);int current=r.bottom-r.top,difference=g_targetHeight-current;if(abs(difference)<=2){SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,g_settingsClosing?collapsedWidth():r.right-r.left,g_targetHeight,SWP_NOACTIVATE);constrainToMonitor(hwnd);g_targetHeight=0;if(g_settingsClosing){g_appearance.settingsOpen=false;g_settingsClosing=false;if(g_appearance.overkill)positionOverkill(hwnd);InvalidateRect(hwnd,nullptr,FALSE);}return;}int magnitude=std::min(abs(difference),std::clamp(abs(difference)/4,4,28));int step=difference<0?-magnitude:magnitude;SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,r.right-r.left,current+step,SWP_NOACTIVATE);constrainToMonitor(hwnd);}
   void applyWindowMode(HWND hwnd)
   {
+    if(g_appliedWindowedMode&&!g_windowedMode)g_interactive=false;
     RECT r{};GetWindowRect(hwnd,&r);
     if(g_windowedMode)
     {
@@ -100,12 +101,13 @@ void applyOpacity(HWND hwnd)
     {
       DWM_BLURBEHIND blur{DWM_BB_ENABLE,TRUE,nullptr,TRUE};DwmEnableBlurBehindWindow(hwnd,&blur);MARGINS margins{-1};DwmExtendFrameIntoClientArea(hwnd,&margins);
       SetWindowLongPtrW(hwnd,GWL_STYLE,WS_POPUP|WS_VISIBLE);
-      LONG_PTR ex=WS_EX_TOPMOST|WS_EX_TOOLWINDOW|WS_EX_NOREDIRECTIONBITMAP|WS_EX_NOACTIVATE|(g_interactive?0:WS_EX_TRANSPARENT);
+      LONG_PTR ex=WS_EX_TOPMOST|WS_EX_TOOLWINDOW|WS_EX_NOREDIRECTIONBITMAP|WS_EX_NOACTIVATE|WS_EX_LAYERED|(g_interactive?0:WS_EX_TRANSPARENT);
       SetWindowLongPtrW(hwnd,GWL_EXSTYLE,ex);
+      SetLayeredWindowAttributes(hwnd,0,255,LWA_ALPHA);
       SetWindowPos(hwnd,HWND_TOPMOST,r.left,r.top,collapsedWidth(),collapsedHeight(),SWP_FRAMECHANGED|SWP_NOACTIVATE|SWP_SHOWWINDOW);
       if(g_appearance.overkill)positionOverkill(hwnd);else constrainToMonitor(hwnd);
     }
-    applyInteraction(hwnd);applyOpacity(hwnd);saveWindowedSetting();RedrawWindow(hwnd,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE|RDW_FRAME|RDW_ALLCHILDREN);
+    applyInteraction(hwnd);g_appliedWindowedMode=g_windowedMode;applyOpacity(hwnd);saveWindowedSetting();RedrawWindow(hwnd,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE|RDW_FRAME|RDW_ALLCHILDREN);
   }
   void settingsApply(void* context){HWND hwnd=static_cast<HWND>(context);updateBackendName();updateCornerName();g_spectrum.setResponse(g_appearance.spectrumResponse);if(!g_discordSettings.enabled)g_discordRpc.disconnect();applyWindowMode(hwnd);resizeWindow(hwnd);saveSettings();WritePrivateProfileStringW(L"Overlay",L"FontFamily",g_fontFamily.c_str(),g_settingsPath.c_str());InvalidateRect(hwnd,nullptr,FALSE);}
   void settingsRecordShortcut(void*){g_recording=true;g_recorded.clear();ZeroMemory(g_scanWasDown,sizeof(g_scanWasDown));updateComboName();g_settingsWindow.refreshShortcut();}
@@ -226,7 +228,7 @@ void applyOpacity(HWND hwnd)
           loadSettings();loadFontSetting();loadSpectrumSettings();loadDiscordSettings();loadWindowedSetting();updateBackendName();updateCornerName();
           if(HRSRC resource=FindResourceW(instance,MAKEINTRESOURCEW(IDR_BANNER_PNG),RT_RCDATA)){if(HGLOBAL data=LoadResource(instance,resource)){g_bannerData=static_cast<const std::uint8_t*>(LockResource(data));g_bannerSize=SizeofResource(instance,resource);}}
           HICON icon=LoadIconW(instance,MAKEINTRESOURCEW(IDI_MUSICOVERLAY));WNDCLASSEXW wc{};wc.cbSize=sizeof(wc);wc.style=CS_HREDRAW|CS_VREDRAW;wc.lpfnWndProc=wndProc;wc.hInstance=instance;wc.hIcon=icon;wc.hIconSm=icon;wc.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));wc.lpszClassName=kClassName;RegisterClassExW(&wc);
-          int width=g_windowedMode?640:collapsedWidth(),height=g_windowedMode?240:collapsedHeight();DWORD style=g_windowedMode?WS_OVERLAPPEDWINDOW:WS_POPUP;DWORD exStyle=g_windowedMode?(WS_EX_APPWINDOW|WS_EX_NOREDIRECTIONBITMAP):(WS_EX_TOPMOST|WS_EX_TOOLWINDOW|WS_EX_NOREDIRECTIONBITMAP|WS_EX_TRANSPARENT|WS_EX_NOACTIVATE);
+          int width=g_windowedMode?640:collapsedWidth(),height=g_windowedMode?240:collapsedHeight();DWORD style=g_windowedMode?WS_OVERLAPPEDWINDOW:WS_POPUP;DWORD exStyle=g_windowedMode?(WS_EX_APPWINDOW|WS_EX_NOREDIRECTIONBITMAP):(WS_EX_TOPMOST|WS_EX_TOOLWINDOW|WS_EX_NOREDIRECTIONBITMAP|WS_EX_TRANSPARENT|WS_EX_LAYERED|WS_EX_NOACTIVATE);
           HWND hwnd=CreateWindowExW(exStyle,kClassName,L"Nihon's Music Framework",style,GetSystemMetrics(SM_CXSCREEN)-width-28,28,width,height,nullptr,nullptr,instance,nullptr);if(!hwnd||!createDevice(hwnd))return 1;
           mo::standalone::SettingsBindings bindings{&g_appearance,&g_discordSettings,&g_backend,&g_windowedMode,&g_fontFamily,hwnd,settingsApply,settingsRecordShortcut};g_settingsWindow.initialize(instance,icon,bindings);
           applyWindowMode(hwnd);ShowWindow(hwnd,g_windowedMode?SW_SHOW:SW_SHOWNOACTIVATE);addTrayIcon(hwnd,icon);SetTimer(hwnd,kTimer,8,nullptr);g_media.start();MSG msg{};while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}return static_cast<int>(msg.wParam);
