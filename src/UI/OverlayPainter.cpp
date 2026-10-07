@@ -155,7 +155,8 @@ bool OverlayPainter::initialize()
               updateLogo(rt, a);
               std::uint32_t accentColor=a.dynamicAccent?artworkAccent_:a.accentRgb;
               Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel, primary, secondary, accent, artworkBacking;
-              rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, a.opacity), &panel);
+              // Overall opacity is applied once by the layered Win32 host.
+              rt->CreateSolidColorBrush(D2D1::ColorF(0x11151D, 1.f), &panel);
               rt->CreateSolidColorBrush(D2D1::ColorF(0xF4F7FB, 1.f), &primary);
               rt->CreateSolidColorBrush(D2D1::ColorF(0xAAB4C3, 1.f), &secondary);
               rt->CreateSolidColorBrush(D2D1::ColorF(accentColor, 1.f), &accent);

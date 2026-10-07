@@ -59,9 +59,8 @@ bool createDevice(HWND hwnd){DXGI_SWAP_CHAIN_DESC d{};d.BufferCount=2;d.BufferDe
 void applyInteraction(HWND hwnd){auto style=GetWindowLongPtrW(hwnd,GWL_EXSTYLE);auto wanted=g_interactive?(style&~WS_EX_TRANSPARENT):(style|WS_EX_TRANSPARENT);if(wanted!=style)SetWindowLongPtrW(hwnd,GWL_EXSTYLE,wanted);g_appearance.interactive=g_interactive;}
 void applyOpacity(HWND hwnd)
 {
-  // Panel transparency is rendered by Direct2D. Applying LWA_ALPHA here would
-  // make artwork, text, and controls translucent along with the panel.
-  SetLayeredWindowAttributes(hwnd,RGB(0,0,0),255,LWA_COLORKEY);
+  const BYTE alpha=static_cast<BYTE>(std::clamp(g_appearance.opacity,.1f,1.f)*255.f+.5f);
+  SetLayeredWindowAttributes(hwnd,RGB(0,0,0),alpha,LWA_COLORKEY|LWA_ALPHA);
   }
   int collapsedHeight(){return g_appearance.overkill?kOverkillHeight:(g_appearance.compact?kCompactHeight:kNormalHeight);}
   int collapsedWidth(){return g_appearance.overkill?kOverkillWidth:(g_appearance.compact?kCompactWidth:kNormalWidth);}

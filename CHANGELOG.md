@@ -9,6 +9,12 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
 
+## [1.3.2] - 2026-10-07
+
+### Stashed fix
+
+- Applied the transparency setting to the complete overlay, including artwork, text, and Overkill spectra, instead of only the background panel
+
 ## [1.3.1] - 2026-10-07
 
 ### Fixed
