@@ -8,9 +8,24 @@ All notable changes to Nihon's Music Framework are documented here. The project 
 - A complete D3D12 command-recording contract
 - Expanded no-CRT experimentation
 - Future Linux support through MPRIS, PipeWire, and SDL3
+
+## [1.3.0] - 2026-10-07
+
+### Added
+
+- Configurable Overkill bar/point count, response, delay, maximum height, top fade, Chroma hue shifting, curve rendering, and artwork-masked spectra
+- Optional Discord Rich Presence with track metadata, playback timestamps, configurable application/assets, and website/repository buttons
+
+### Changed
+
+- Spectrum curves now flow from the selected corner wall into the corresponding top or bottom screen edge
+- Parenthetical title suffixes now move onto new lines, with a persisted option to hide them
+- Artwork Spectrum now replaces the normal Overkill artwork tile instead of displaying the cover twice
+
+### Fixed
+
 - Restarted Overkill spectrum capture when the active audio-session process changes or capture fails
 - Removed chroma-key outlines from Overkill text and spectrum bars while preserving opaque black artwork
-- Moved parenthetical title suffixes onto new lines and added a persisted option to hide them
 
 ## [1.2.2] - 2026-10-06
 

@@ -18,6 +18,15 @@ struct Appearance {
   bool overkill{};
   bool showBanner{true};
   bool ignoreParenthetical{};
+  bool spectrumChroma{};
+  bool spectrumCurves{};
+  bool artworkSpectrum{};
+  std::uint32_t spectrumBars{32};
+  std::uint32_t spectrumDelayMs{};
+  std::uint32_t spectrumResponse{1};
+  std::uint32_t spectrumMaxHeight{100};
+  std::uint32_t spectrumFade{10};
+  std::uint32_t spectrumHueSpeed{30};
   std::uint32_t corner{};
   const wchar_t* logoPath{};
   const std::uint8_t* logoData{};
@@ -26,7 +35,7 @@ struct Appearance {
   const wchar_t* backendName{L"DirectX 11"};
   const wchar_t* cornerName{L"Top right"};
 };
-struct FrameView { std::uint32_t width{}; std::uint32_t height{}; float dpi{96.0f}; TrackInfo track; Appearance appearance; std::array<float,32> spectrum{}; };
+struct FrameView { std::uint32_t width{}; std::uint32_t height{}; float dpi{96.0f}; TrackInfo track; Appearance appearance; std::array<float,64> spectrum{}; };
 class IRenderer {
 public:
   virtual ~IRenderer() = default;

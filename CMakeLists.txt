@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(NihonsMusicFramework VERSION 1.2.2 LANGUAGES C CXX)
+project(NihonsMusicFramework VERSION 1.3.0 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -112,6 +112,8 @@ if(MUSICOVERLAY_BUILD_STANDALONE)
   else()
     add_executable(musicoverlay_app WIN32
       src/Standalone/WinMain.cpp
+      src/Platform/Windows/DiscordRpc.cpp
+      src/Platform/Windows/DiscordRpc.h
       src/Standalone/MusicOverlay.rc
       src/Standalone/app.manifest
       src/Standalone/resource.h)

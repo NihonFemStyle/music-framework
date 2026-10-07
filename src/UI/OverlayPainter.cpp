@@ -97,6 +97,52 @@ bool OverlayPainter::initialize()
             if(SUCCEEDED(wic_->CreateBitmapScaler(&scaler))&&SUCCEEDED(scaler->Initialize(frame.Get(),1,1,WICBitmapInterpolationModeFant))&&SUCCEEDED(wic_->CreateFormatConverter(&converter))&&SUCCEEDED(converter->Initialize(scaler.Get(),GUID_WICPixelFormat32bppRGBA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom))){BYTE pixel[4]{};if(SUCCEEDED(converter->CopyPixels(nullptr,4,4,pixel))){float r=pixel[0],g=pixel[1],b=pixel[2],bright=std::max({r,g,b});if(bright<8.f){artworkAccent_=0x68D5C8;}else{float scale=std::clamp(235.f/bright,1.15f,3.25f);auto vivid=[scale](float channel){return static_cast<std::uint32_t>(std::clamp((channel-24.f)*scale+32.f,32.f,255.f));};artworkAccent_=(vivid(r)<<16)|(vivid(g)<<8)|vivid(b);}}}
             }
 
+            std::array<float,64> OverlayPainter::delayedSpectrum(const std::array<float,64>& spectrum,std::uint32_t delayMs)
+            {
+              const auto now=GetTickCount64();spectrumHistory_.push_back({now,spectrum});
+              while(spectrumHistory_.size()>2&&now-spectrumHistory_[1].tick>std::max<std::uint32_t>(delayMs,500u))spectrumHistory_.pop_front();
+              if(!delayMs)return spectrum;
+              const auto target=now>delayMs?now-delayMs:0;auto result=spectrumHistory_.front().bands;
+              for(const auto& sample:spectrumHistory_){if(sample.tick>target)break;result=sample.bands;}
+              return result;
+              }
+
+              void OverlayPainter::drawSpectrum(ID2D1RenderTarget* rt,ID2D1Bitmap* artwork,const Appearance& a,
+              const std::array<float,64>& spectrum,float w,float h,std::uint32_t accentColor)
+              {
+                const std::size_t count=std::clamp<std::size_t>(a.spectrumBars,8,64);const float maxHeight=std::max(8.f,h*std::clamp(a.spectrumMaxHeight,10u,100u)/100.f);
+                std::vector<D2D1_POINT_2F> points;points.reserve(count);
+                for(std::size_t i=0;i<count;++i){const std::size_t source=count==1?0:(i*63)/(count-1);float level=std::clamp(spectrum[source],0.f,1.f);float barHeight=4.f+level*std::max(0.f,maxHeight-4.f);float x=count==1?w*.5f:float(i)*w/float(count-1);float y=a.corner<2?barHeight:h-barHeight;points.push_back(D2D1::Point2F(x,y));}
+
+                Microsoft::WRL::ComPtr<ID2D1Factory> factory;rt->GetFactory(factory.ReleaseAndGetAddressOf());if(!factory)return;
+                Microsoft::WRL::ComPtr<ID2D1Geometry> mask;
+                if(a.spectrumCurves)
+                {
+                  Microsoft::WRL::ComPtr<ID2D1PathGeometry> path;Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;if(FAILED(factory->CreatePathGeometry(&path))||FAILED(path->Open(&sink)))return;
+                  const float anchor=a.corner<2?0.f:h;if(a.corner==0||a.corner==2)points.back().y=anchor;else points.front().y=anchor;sink->BeginFigure(D2D1::Point2F(0,anchor),D2D1_FIGURE_BEGIN_FILLED);sink->AddLine(points.front());
+                  for(std::size_t i=0;i+1<points.size();++i){const auto p0=points[i?i-1:i],p1=points[i],p2=points[i+1],p3=points[i+2<points.size()?i+2:i+1];sink->AddBezier(D2D1::BezierSegment(D2D1::Point2F(p1.x+(p2.x-p0.x)/6.f,p1.y+(p2.y-p0.y)/6.f),D2D1::Point2F(p2.x-(p3.x-p1.x)/6.f,p2.y-(p3.y-p1.y)/6.f),p2));}
+                  sink->AddLine(D2D1::Point2F(w,anchor));sink->EndFigure(D2D1_FIGURE_END_CLOSED);sink->Close();mask=path;
+                  }else
+                  {
+                    std::vector<Microsoft::WRL::ComPtr<ID2D1Geometry>> owned;std::vector<ID2D1Geometry*> raw;owned.reserve(count);raw.reserve(count);const float cell=w/float(count),gap=std::max(1.f,cell*.12f);
+                    for(std::size_t i=0;i<count;++i){float level=std::clamp(spectrum[(i*63)/std::max<std::size_t>(1,count-1)],0.f,1.f);float barHeight=4.f+level*std::max(0.f,maxHeight-4.f);float top=a.corner<2?0.f:h-barHeight,bottom=a.corner<2?barHeight:h;Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> bar;factory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(D2D1::RectF(float(i)*cell+gap*.5f,top,float(i+1)*cell-gap*.5f,bottom),3,3),&bar);raw.push_back(bar.Get());owned.push_back(bar);}
+                    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> group;if(FAILED(factory->CreateGeometryGroup(D2D1_FILL_MODE_WINDING,raw.data(),static_cast<UINT32>(raw.size()),&group)))return;mask=group;
+                    }
+
+                    Microsoft::WRL::ComPtr<ID2D1Brush> fillBrush;Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> accentBrush;Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> chromaBrush;
+                    if(a.spectrumChroma&&!a.artworkSpectrum)
+                    {
+                      D2D1_GRADIENT_STOP stops[7]{};const float shift=float((GetTickCount64()*a.spectrumHueSpeed/1000)%360);
+                      for(UINT i=0;i<7;++i){float hue=std::fmod(shift+float(i)*60.f,360.f),c=1.f,x=c*(1.f-std::abs(std::fmod(hue/60.f,2.f)-1.f));float r{},g{},b{};if(hue<60){r=c;g=x;}else if(hue<120){r=x;g=c;}else if(hue<180){g=c;b=x;}else if(hue<240){g=x;b=c;}else if(hue<300){r=x;b=c;}else{r=c;b=x;}stops[i]={float(i)/6.f,D2D1::ColorF(r,g,b,.92f)};}
+                      Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;if(SUCCEEDED(rt->CreateGradientStopCollection(stops,7,&collection)))rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(0,0),D2D1::Point2F(w,0)),collection.Get(),&chromaBrush);fillBrush=chromaBrush;
+                      }else if(!a.artworkSpectrum||!artwork){rt->CreateSolidColorBrush(D2D1::ColorF(accentColor,.9f),&accentBrush);fillBrush=accentBrush;}
+
+                      Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> fadeBrush;
+                      if(a.spectrumFade){const float fade=std::clamp(a.spectrumFade,1u,100u)/100.f;D2D1_GRADIENT_STOP stops[]={{0,D2D1::ColorF(0xffffff,0.f)},{fade,D2D1::ColorF(0xffffff,1.f)},{1,D2D1::ColorF(0xffffff,1.f)}};Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;if(SUCCEEDED(rt->CreateGradientStopCollection(stops,3,&collection))){const bool growsDown=a.corner<2;rt->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(growsDown?D2D1::Point2F(0,h):D2D1::Point2F(0,0),growsDown?D2D1::Point2F(0,0):D2D1::Point2F(0,h)),collection.Get(),&fadeBrush);}}
+                      Microsoft::WRL::ComPtr<ID2D1Layer> layer;rt->CreateLayer(nullptr,&layer);rt->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(),mask.Get(),D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,D2D1::Matrix3x2F::Identity(),1.f,fadeBrush.Get()),layer.Get());
+                      if(a.artworkSpectrum&&artwork){auto size=artwork->GetSize();float targetAspect=w/h,sourceAspect=size.width/std::max(1.f,size.height);D2D1_RECT_F source{};if(sourceAspect>targetAspect){float crop=size.height*targetAspect,left=(size.width-crop)*.5f;source=D2D1::RectF(left,0,left+crop,size.height);}else{float crop=size.width/targetAspect,top=(size.height-crop)*.5f;source=D2D1::RectF(0,top,size.width,top+crop);}rt->DrawBitmap(artwork,D2D1::RectF(0,0,w,h),.94f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,source);}else if(fillBrush)rt->FillRectangle(D2D1::RectF(0,0,w,h),fillBrush.Get());rt->PopLayer();
+                      }
+
             void OverlayPainter::paint(ID2D1RenderTarget* rt, const FrameView& frame)
             {
               const auto& t = frame.track; const auto& a = frame.appearance;
@@ -136,8 +182,8 @@ bool OverlayPainter::initialize()
                     float textLeft = 22.f;
                     if(a.overkill&&!a.settingsOpen)
                     {
-                      float barWidth=w/32.f;for(std::size_t i=0;i<frame.spectrum.size();++i){float level=std::clamp(frame.spectrum[i],0.f,1.f);float barHeight=4.f+level*(h-4.f);Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> spectrumBrush;rt->CreateSolidColorBrush(D2D1::ColorF(accentColor,.22f+.68f*level),&spectrumBrush);float left=float(i)*barWidth;float right=float(i+1)*barWidth-1.f;float top=a.corner<2?0.f:h-barHeight;float bottom=a.corner<2?barHeight:h;rt->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(left,top,right,bottom),3,3),spectrumBrush.Get());}
-                      if(displayedArtwork){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(displayedArtwork,artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}float overkillLeft=displayedArtwork?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":titleForDisplay(t.title,a.ignoreParenthetical);std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
+                      drawSpectrum(rt,displayedArtwork,a,delayedSpectrum(frame.spectrum,a.spectrumDelayMs),w,h,accentColor);
+                      const bool showArtworkTile=displayedArtwork&&!a.artworkSpectrum;if(showArtworkTile){const auto artRect=D2D1::RectF(16,14,122,120);if(!aprilFools)rt->FillRectangle(artRect,artworkBacking.Get());rt->DrawBitmap(displayedArtwork,artRect,1.f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);}float overkillLeft=showArtworkTile?140.f:22.f;std::wstring overkillTitle=t.title.empty()?L"Nothing playing":titleForDisplay(t.title,a.ignoreParenthetical);std::wstring overkillArtist=t.artist.empty()?L"Windows media session":t.artist;drawFittedText(rt,overkillTitle,D2D1::RectF(overkillLeft,18,w-22,78),28,13,primary.Get(),DWRITE_FONT_WEIGHT_SEMI_BOLD);drawFittedText(rt,overkillArtist,D2D1::RectF(overkillLeft,82,w-22,112),16,10,secondary.Get(),DWRITE_FONT_WEIGHT_NORMAL);if(a.showBanner&&logo_)rt->DrawBitmap(logo_.Get(),D2D1::RectF(18,128,168,174),.88f,D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);return;
                       }
                       if (displayedArtwork&&!a.artworkBackground)
                       {

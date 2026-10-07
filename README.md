@@ -32,6 +32,7 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 - Tray icon for settings, interaction control, and clean exit
 - Optional corner-locked Overkill layout with a source-isolated, real-time audio spectrum
 - Persistent settings under `%LOCALAPPDATA%\NihonsMusicFramework\settings.ini`
+- Optional Discord Rich Presence with music metadata, playback timestamps, configurable assets, and project links
 - Embedded banner, application icon, and Release runtime dependencies
 - Renderer abstraction for Direct3D 9, 10, 11, and 12 integration
 - Optional SDL3 frontend with selectable OpenGL and Vulkan rendering
@@ -103,15 +104,23 @@ The tray icon provides the complete settings surface directly: transparency pres
 
 ### Metadata formatting
 
-Common featured-performer markers such as `feat.`, `featuring`, and `ft.` are removed from the title and appended to the artist line. Title separators such as ` - `, en/em dashes, and ` | ` become line breaks so version names, VIP mixes, and remix labels remain readable without forcing the player wider.
+Common featured-performer markers such as `feat.`, `featuring`, and `ft.` are removed from the title and appended to the artist line. Title separators such as ` - `, en/em dashes, ` | `, and parenthetical suffixes become line breaks so version names, VIP mixes, and remix labels remain readable without forcing the player wider. Parenthetical suffixes can instead be hidden with the persisted **Ignore title parentheses** setting.
 
 ### Overkill mode
 
-Overkill mode adds a 32-band spectrum visualizer around a larger album-art and metadata layout. It can be assigned to any screen corner and is locked there instead of being freely dragged. When the foreground application occupies an entire monitor, the overlay uses that monitor's full bounds rather than its taskbar work area.
+Overkill mode adds a source-responsive spectrum visualizer around a larger album-art and metadata layout. It can be assigned to any screen corner and is locked there instead of being freely dragged. When the foreground application occupies an entire monitor, the overlay uses that monitor's full bounds rather than its taskbar work area.
+
+The tray settings expose 16–64 bars or curve points, response speed, display delay, maximum height, and a configurable top fade that defaults to 10% and can be disabled with 0%. The spectrum can use the normal accent, an animated Chroma hue shift, or the current artwork as a geometry-clipped transparency mask. Curves flow from the selected corner's screen wall and settle into the top or bottom screen edge rather than ending in a vertical cutoff.
 
 The spectrum uses Windows process-loopback capture for the application that owns the active media session. It deliberately does not fall back to system-wide capture, so unrelated applications are not visualized. Some protected-content players and media applications whose session cannot be mapped to a process may therefore show an idle spectrum.
 
 > On April 1, artwork-background mode intentionally stretches the artwork. This is a feature of questionable artistic merit.
+
+### Discord Rich Presence
+
+Discord Rich Presence can be toggled from the notification-area menu. When enabled, it publishes the current title, artist, album, playback state, and start/end timestamps. Discord uses those timestamps for its native elapsed or remaining-time display. The activity includes **Trigon.Systems** and **GitHub Repo** buttons.
+
+The bundled configuration uses application ID `1061319148602392616` and the `logo` image asset when nothing is playing. See [Discord Rich Presence configuration](docs/DISCORD_RPC.md) to use your own Discord application and artwork asset.
 
 ## Build options
 
@@ -166,6 +175,7 @@ docs/                       Design, build, integration, and no-CRT guides
 
 - [Building and packaging](docs/BUILDING.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Discord Rich Presence configuration](docs/DISCORD_RPC.md)
 - [Integration guide](docs/INTEGRATION.md)
 - [No-CRT scope and limitations](docs/NOCRT.md)
 - [Publishing releases](docs/RELEASING.md)

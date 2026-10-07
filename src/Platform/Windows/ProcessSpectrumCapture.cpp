@@ -76,7 +76,8 @@ namespace
               if(samples.size()<512)continue;if(samples.size()>2048)samples.erase(samples.begin(),samples.end()-2048);std::size_t count=std::min<std::size_t>(1024,samples.size()),offset=samples.size()-count;
               std::array<float,BandCount> levels{};float peak=.0005f;
               for(std::size_t band=0;band<BandCount;++band){double frequency=45.0*std::pow(16000.0/45.0,double(band)/double(BandCount-1));double real=0,imag=0;for(std::size_t i=0;i<count;++i){double window=.5-.5*std::cos(6.283185307179586*double(i)/double(count-1));double angle=6.283185307179586*frequency*double(i)/double(sampleRate_);double value=samples[offset+i]*window;real+=value*std::cos(angle);imag-=value*std::sin(angle);}levels[band]=float(std::sqrt(real*real+imag*imag)/double(count));peak=std::max(peak,levels[band]);}
-              for(std::size_t band=0;band<BandCount;++band){float level=std::clamp(std::sqrt(levels[band]/peak),0.f,1.f);float old=bands_[band].load();bands_[band]=level>old?old*.2f+level*.8f:old*.76f+level*.24f;}
+              const auto response=response_.load();const float attackOld=response==0?.05f:response==2?.58f:.2f;const float releaseOld=response==0?.45f:response==2?.91f:.76f;
+              for(std::size_t band=0;band<BandCount;++band){float level=std::clamp(std::sqrt(levels[band]/peak),0.f,1.f);float old=bands_[band].load();bands_[band]=level>old?old*attackOld+level*(1.f-attackOld):old*releaseOld+level*(1.f-releaseOld);}
               }CoUninitialize();
               }
 

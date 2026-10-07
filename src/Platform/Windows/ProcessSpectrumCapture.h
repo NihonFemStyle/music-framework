@@ -10,13 +10,14 @@ namespace mo::win
 class ProcessSpectrumCapture
 {
   public:
-  static constexpr std::size_t BandCount=32;
+  static constexpr std::size_t BandCount=64;
   ProcessSpectrumCapture()=default;
   ~ProcessSpectrumCapture(){stop();}
   ProcessSpectrumCapture(const ProcessSpectrumCapture&)=delete;
   ProcessSpectrumCapture& operator=(const ProcessSpectrumCapture&)=delete;
   bool startForApp(const std::wstring& appId);
   bool ensureForApp(const std::wstring& appId);
+  void setResponse(std::uint32_t response) noexcept{response_=response>2?2:response;}
   void stop();
   [[nodiscard]] std::array<float,BandCount> snapshot() const;
   [[nodiscard]] const std::wstring& activeAppId() const noexcept{return appId_;}
@@ -27,6 +28,7 @@ class ProcessSpectrumCapture
   std::uint32_t processId_{};
   std::atomic_bool stopping_{};
   std::atomic_bool captureFailed_{};
+  std::atomic_uint32_t response_{1};
   std::array<std::atomic<float>,BandCount> bands_{};
   void* audioClient_{};
   void* captureClient_{};

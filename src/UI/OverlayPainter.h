@@ -4,6 +4,7 @@
 #include <dwrite.h>
 #include <wincodec.h>
 #include <wrl/client.h>
+#include <deque>
 namespace mo
 {
 class OverlayPainter
@@ -18,6 +19,9 @@ class OverlayPainter
   bool forceOpaque = false);
   void drawFittedText(ID2D1RenderTarget* target, const std::wstring& text, D2D1_RECT_F box,
   float maximumSize, float minimumSize, ID2D1Brush* brush, DWRITE_FONT_WEIGHT weight);
+  std::array<float,64> delayedSpectrum(const std::array<float,64>& spectrum,std::uint32_t delayMs);
+  void drawSpectrum(ID2D1RenderTarget* target,ID2D1Bitmap* artwork,const Appearance& appearance,
+                    const std::array<float,64>& spectrum,float width,float height,std::uint32_t accentColor);
   Microsoft::WRL::ComPtr<IDWriteFactory> write_;
   Microsoft::WRL::ComPtr<IWICImagingFactory> wic_;
   Microsoft::WRL::ComPtr<IDWriteTextFormat> title_;
@@ -36,5 +40,7 @@ class OverlayPainter
   std::wstring progressTitle_;
   std::wstring logoPath_;
   const std::uint8_t* logoData_{};
+  struct SpectrumSample{std::uint64_t tick{};std::array<float,64> bands{};};
+  std::deque<SpectrumSample> spectrumHistory_;
   };
   }
