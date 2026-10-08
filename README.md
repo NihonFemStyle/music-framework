@@ -11,6 +11,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-0078D4">
   <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-20-00599C">
   <img alt="Build" src="https://img.shields.io/badge/build-CMake-064F8C">
+  <a href="https://www.jetbrains.com/clion/"><img alt="CLion" src="https://img.shields.io/badge/CLion-supported-000000?logo=clion&logoColor=white"></a>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
