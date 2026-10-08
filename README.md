@@ -141,13 +141,16 @@ The bundled configuration uses application ID `1061319148602392616` and the `log
 .\build.ps1 -Architecture ARM64
 .\build.ps1 -Clean
 .\build.ps1 -NoCRT
+.\build.ps1 -CLion
+.\build.ps1 -CLion -SDL
+.\build.ps1 -CLion -CLionToolchain MinGW
 ```
 
-Release builds use the static MSVC runtime and embed the application artwork. See [Building](docs/BUILDING.md) for direct CMake commands, install targets, and troubleshooting.
+The normal script path remains the default and does not require CLion. Current CLion releases automatically discover the committed CMake presets; `-CLion` configures and builds the matching preset from PowerShell. MSBuild is the default CLion toolchain, with optional MinGW profiles for standard and SDL builds; MinGW architecture follows the configured CLion toolchain. Release builds made with MSVC use the static runtime and embed the application artwork. See [Building](docs/BUILDING.md) for CLion profiles, direct CMake commands, install targets, and troubleshooting.
 
 ### Cutting-edge artifacts
 
-Every push to `main`, nightly schedule, or manual dispatch builds downloadable cutting-edge artifacts for x64, Win32, and ARM64 across Debug, Release, RelWithDebInfo, and MinSizeRel. The same matrix is built for the experimental no-CRT mode. These artifacts are retained for 14 days and identify their exact commit and configuration in `build-info.txt`; they are development snapshots, not stable releases.
+Pushes to `main` build downloadable cutting-edge artifacts only when files under `src/` or `include/` change. A manual dispatch can still force a build. The workflow covers x64, Win32, and ARM64 across Debug, Release, RelWithDebInfo, and MinSizeRel, including the experimental no-CRT mode. Artifacts are retained for 14 days and identify their exact commit and configuration in `build-info.txt`; they are development snapshots, not stable releases.
 
 ## Renderer support
 

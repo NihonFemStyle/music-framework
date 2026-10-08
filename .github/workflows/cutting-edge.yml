@@ -3,8 +3,9 @@ name: Cutting Edge Builds
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: "23 5 * * *"
+    paths:
+      - "src/**"
+      - "include/**"
   workflow_dispatch:
 
 permissions:

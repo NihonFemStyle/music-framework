@@ -22,6 +22,8 @@ Parameters:
 | `-Architecture` | `x64`, `Win32`, `ARM64` | `x64` |
 | `-NoCRT` | Enables the experimental constrained no-CRT executable | Off |
 | `-SDL` | Builds the optional SDL3 OpenGL/Vulkan frontend | Off |
+| `-CLion` | Uses the matching CLion CMake preset and build tree | Off |
+| `-CLionToolchain` | `MSBuild`, `MinGW` | `MSBuild` |
 | `-Clean` | Removes the selected build tree before configuring | Off |
 | `-Jobs` | Parallel build-job count | Logical processor count |
 
@@ -33,13 +35,32 @@ Examples:
 .\build.ps1 -Clean
 .\build.ps1 -NoCRT
 .\build.ps1 -SDL
+.\build.ps1 -CLion
+.\build.ps1 -CLion -SDL -Configuration Debug
+.\build.ps1 -CLion -CLionToolchain MinGW
 ```
 
 Output follows this pattern:
 
 ```text
-build-<architecture>-<default|nocrt>/<configuration>/musicoverlay_app.exe
+build-<architecture>-<default|sdl|nocrt>/<configuration>/musicoverlay_app.exe
 ```
+
+The original Visual Studio generator path remains the default and requires no JetBrains software. With `-CLion`, output instead uses `cmake-build-clion-<architecture>-<default|sdl|nocrt>`.
+
+## CLion
+
+Open the repository root in a current CLion release and reload the CMake project. CLion detects `CMakePresets.json`. Every profile has explicit **Debug** and **Release** build presets. MSBuild profiles select the CLion toolchain named **Visual Studio** and cover Standard, SDL3 OpenGL/Vulkan, and experimental No-CRT builds for x64, Win32, and ARM64. Separate Standard and SDL presets select the toolchain named **MinGW**; their architecture comes from that toolchain.
+
+```powershell
+.\build.ps1 -CLion
+.\build.ps1 -CLion -Architecture Win32 -Configuration Debug
+.\build.ps1 -CLion -Architecture ARM64 -NoCRT -Configuration MinSizeRel
+.\build.ps1 -CLion -CLionToolchain MinGW
+.\build.ps1 -CLion -CLionToolchain MinGW -SDL -Configuration Debug
+```
+
+CLion is optional. The default profiles use the installed Visual Studio 2022 MSVC and Windows SDK toolchain and do not replace the normal build workflow. The MinGW presets use the compiler architecture configured in CLion's MinGW toolchain. The No-CRT path remains MSVC-only.
 
 ## Direct CMake use
 

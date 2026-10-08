@@ -1,0 +1,53 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    { "name": "clion-base", "hidden": true, "generator": "Visual Studio 17 2022", "vendor": { "jetbrains.com/clion": { "toolchain": "Visual Studio" } } },
+    { "name": "clion-x64-base", "hidden": true, "inherits": "clion-base", "architecture": "x64" },
+    { "name": "clion-win32-base", "hidden": true, "inherits": "clion-base", "architecture": "Win32" },
+    { "name": "clion-arm64-base", "hidden": true, "inherits": "clion-base", "architecture": "ARM64" },
+    { "name": "clion-mingw-base", "hidden": true, "generator": "Ninja Multi-Config", "vendor": { "jetbrains.com/clion": { "toolchain": "MinGW" } } },
+
+    { "name": "clion-x64-default", "displayName": "CLion | MSBuild | x64 | Standard", "inherits": "clion-x64-base", "binaryDir": "${sourceDir}/cmake-build-clion-x64-default", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } },
+    { "name": "clion-x64-sdl", "displayName": "CLion | MSBuild | x64 | SDL OpenGL/Vulkan", "inherits": "clion-x64-base", "binaryDir": "${sourceDir}/cmake-build-clion-x64-sdl", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "ON" } },
+    { "name": "clion-x64-nocrt", "displayName": "CLion | MSBuild | x64 | Experimental No-CRT", "inherits": "clion-x64-base", "binaryDir": "${sourceDir}/cmake-build-clion-x64-nocrt", "cacheVariables": { "MUSICOVERLAY_NOCRT": "ON", "MUSICOVERLAY_BUILD_INTEGRATION": "OFF", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } },
+
+    { "name": "clion-mingw-default", "displayName": "CLion | MinGW | Standard", "inherits": "clion-mingw-base", "binaryDir": "${sourceDir}/cmake-build-clion-mingw-default", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } },
+    { "name": "clion-mingw-sdl", "displayName": "CLion | MinGW | SDL OpenGL/Vulkan", "inherits": "clion-mingw-base", "binaryDir": "${sourceDir}/cmake-build-clion-mingw-sdl", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "ON" } },
+
+    { "name": "clion-win32-default", "displayName": "CLion | MSBuild | Win32 | Standard", "inherits": "clion-win32-base", "binaryDir": "${sourceDir}/cmake-build-clion-Win32-default", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } },
+    { "name": "clion-win32-sdl", "displayName": "CLion | MSBuild | Win32 | SDL OpenGL/Vulkan", "inherits": "clion-win32-base", "binaryDir": "${sourceDir}/cmake-build-clion-Win32-sdl", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "ON" } },
+    { "name": "clion-win32-nocrt", "displayName": "CLion | MSBuild | Win32 | Experimental No-CRT", "inherits": "clion-win32-base", "binaryDir": "${sourceDir}/cmake-build-clion-Win32-nocrt", "cacheVariables": { "MUSICOVERLAY_NOCRT": "ON", "MUSICOVERLAY_BUILD_INTEGRATION": "OFF", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } },
+
+    { "name": "clion-arm64-default", "displayName": "CLion | MSBuild | ARM64 | Standard", "inherits": "clion-arm64-base", "binaryDir": "${sourceDir}/cmake-build-clion-ARM64-default", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } },
+    { "name": "clion-arm64-sdl", "displayName": "CLion | MSBuild | ARM64 | SDL OpenGL/Vulkan", "inherits": "clion-arm64-base", "binaryDir": "${sourceDir}/cmake-build-clion-ARM64-sdl", "cacheVariables": { "MUSICOVERLAY_NOCRT": "OFF", "MUSICOVERLAY_BUILD_INTEGRATION": "ON", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "ON" } },
+    { "name": "clion-arm64-nocrt", "displayName": "CLion | MSBuild | ARM64 | Experimental No-CRT", "inherits": "clion-arm64-base", "binaryDir": "${sourceDir}/cmake-build-clion-ARM64-nocrt", "cacheVariables": { "MUSICOVERLAY_NOCRT": "ON", "MUSICOVERLAY_BUILD_INTEGRATION": "OFF", "MUSICOVERLAY_BUILD_SDL_FRONTEND": "OFF" } }
+  ],
+  "buildPresets": [
+    { "name": "clion-x64-default-debug", "displayName": "CLion | MSBuild | x64 | Standard | Debug", "configurePreset": "clion-x64-default", "configuration": "Debug" },
+    { "name": "clion-x64-default-release", "displayName": "CLion | MSBuild | x64 | Standard | Release", "configurePreset": "clion-x64-default", "configuration": "Release" },
+    { "name": "clion-x64-sdl-debug", "displayName": "CLion | MSBuild | x64 | SDL | Debug", "configurePreset": "clion-x64-sdl", "configuration": "Debug" },
+    { "name": "clion-x64-sdl-release", "displayName": "CLion | MSBuild | x64 | SDL | Release", "configurePreset": "clion-x64-sdl", "configuration": "Release" },
+    { "name": "clion-x64-nocrt-debug", "displayName": "CLion | MSBuild | x64 | No-CRT | Debug", "configurePreset": "clion-x64-nocrt", "configuration": "Debug" },
+    { "name": "clion-x64-nocrt-release", "displayName": "CLion | MSBuild | x64 | No-CRT | Release", "configurePreset": "clion-x64-nocrt", "configuration": "Release" },
+
+    { "name": "clion-win32-default-debug", "displayName": "CLion | MSBuild | Win32 | Standard | Debug", "configurePreset": "clion-win32-default", "configuration": "Debug" },
+    { "name": "clion-win32-default-release", "displayName": "CLion | MSBuild | Win32 | Standard | Release", "configurePreset": "clion-win32-default", "configuration": "Release" },
+    { "name": "clion-win32-sdl-debug", "displayName": "CLion | MSBuild | Win32 | SDL | Debug", "configurePreset": "clion-win32-sdl", "configuration": "Debug" },
+    { "name": "clion-win32-sdl-release", "displayName": "CLion | MSBuild | Win32 | SDL | Release", "configurePreset": "clion-win32-sdl", "configuration": "Release" },
+    { "name": "clion-win32-nocrt-debug", "displayName": "CLion | MSBuild | Win32 | No-CRT | Debug", "configurePreset": "clion-win32-nocrt", "configuration": "Debug" },
+    { "name": "clion-win32-nocrt-release", "displayName": "CLion | MSBuild | Win32 | No-CRT | Release", "configurePreset": "clion-win32-nocrt", "configuration": "Release" },
+
+    { "name": "clion-arm64-default-debug", "displayName": "CLion | MSBuild | ARM64 | Standard | Debug", "configurePreset": "clion-arm64-default", "configuration": "Debug" },
+    { "name": "clion-arm64-default-release", "displayName": "CLion | MSBuild | ARM64 | Standard | Release", "configurePreset": "clion-arm64-default", "configuration": "Release" },
+    { "name": "clion-arm64-sdl-debug", "displayName": "CLion | MSBuild | ARM64 | SDL | Debug", "configurePreset": "clion-arm64-sdl", "configuration": "Debug" },
+    { "name": "clion-arm64-sdl-release", "displayName": "CLion | MSBuild | ARM64 | SDL | Release", "configurePreset": "clion-arm64-sdl", "configuration": "Release" },
+    { "name": "clion-arm64-nocrt-debug", "displayName": "CLion | MSBuild | ARM64 | No-CRT | Debug", "configurePreset": "clion-arm64-nocrt", "configuration": "Debug" },
+    { "name": "clion-arm64-nocrt-release", "displayName": "CLion | MSBuild | ARM64 | No-CRT | Release", "configurePreset": "clion-arm64-nocrt", "configuration": "Release" },
+
+    { "name": "clion-mingw-default-debug", "displayName": "CLion | MinGW | Standard | Debug", "configurePreset": "clion-mingw-default", "configuration": "Debug" },
+    { "name": "clion-mingw-default-release", "displayName": "CLion | MinGW | Standard | Release", "configurePreset": "clion-mingw-default", "configuration": "Release" },
+    { "name": "clion-mingw-sdl-debug", "displayName": "CLion | MinGW | SDL | Debug", "configurePreset": "clion-mingw-sdl", "configuration": "Debug" },
+    { "name": "clion-mingw-sdl-release", "displayName": "CLion | MinGW | SDL | Release", "configurePreset": "clion-mingw-sdl", "configuration": "Release" }
+  ]
+}
