@@ -25,6 +25,10 @@ $buildSuffix = if ($NoCRT) { 'nocrt' } elseif ($SDL) { 'sdl' } else { 'default' 
 $buildDirectoryName = if ($CLion -and $CLionToolchain -eq 'MinGW') { "cmake-build-clion-mingw-$buildSuffix" } elseif ($CLion) { "cmake-build-clion-$Architecture-$buildSuffix" } else { "build-$Architecture-$buildSuffix" }
 $buildDirectory = Join-Path $projectRoot $buildDirectoryName
 
+if ($NoCRT -and $SDL) {
+    throw 'The SDL frontend requires the CRT. Build -NoCRT and -SDL in separate invocations.'
+}
+
 if ($CLion -and $CLionToolchain -eq 'MinGW' -and $NoCRT) {
     throw 'The constrained no-CRT build requires MSVC. Use -CLionToolchain MSBuild with -NoCRT.'
 }
@@ -52,11 +56,6 @@ $configureArguments = if ($CLion) {
     )
 }
 
-if ($NoCRT -and -not $CLion) {
-    # The constrained no-CRT executable intentionally does not link the C++ integration library.
-    $configureArguments += '-DMUSICOVERLAY_BUILD_INTEGRATION=OFF'
-}
-
 Write-Host "Configuring MusicOverlay ($Architecture, $Configuration, NOCRT=$($NoCRT.IsPresent), SDL=$($SDL.IsPresent), CLion=$($CLion.IsPresent), CLionToolchain=$CLionToolchain)"
 & cmake @configureArguments
 if ($LASTEXITCODE -ne 0) {
@@ -74,6 +73,14 @@ if (Test-Path -LiteralPath $executable) {
     Write-Host "Build complete: $executable" -ForegroundColor Green
 } else {
     Write-Host "Build completed, but the executable was not found at the expected path: $executable" -ForegroundColor Yellow
+}
+if ($NoCRT -and (Get-Command dumpbin -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $executable)) {
+    $runtimeImports = & dumpbin /dependents $executable | Select-String -Pattern 'VCRUNTIME|MSVCP|UCRTBASE|api-ms-win-crt'
+    if ($runtimeImports) {
+        Write-Host "Warning: the no-CRT executable imports runtime DLLs:`n$runtimeImports" -ForegroundColor Yellow
+    } else {
+        Write-Host 'Verified: the no-CRT executable imports no C/C++ runtime DLLs.' -ForegroundColor Green
+    }
 }
 if ($SDL) {
     $sdlExecutable = Join-Path $buildDirectory "$Configuration\musicoverlay_sdl.exe"

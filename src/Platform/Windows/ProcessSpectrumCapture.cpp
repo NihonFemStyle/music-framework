@@ -64,10 +64,12 @@ namespace
           floatSamples_=false;sampleRate_=format.nSamplesPerSec;channels_=format.nChannels;
           REFERENCE_TIME duration=0;hr=client->Initialize(AUDCLNT_SHAREMODE_SHARED,AUDCLNT_STREAMFLAGS_LOOPBACK|AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM|AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,duration,0,&format,nullptr);if(FAILED(hr))return false;
           ComPtr<IAudioCaptureClient> capture;if(FAILED(client->GetService(IID_PPV_ARGS(&capture)))||FAILED(client->Start()))return false;
-          audioClient_=client.Detach();captureClient_=capture.Detach();sampleEvent_=nullptr;appId_=appId;processId_=pid;captureFailed_=false;stopping_=false;thread_=std::thread([this]{captureLoop();});return true;
+          audioClient_=client.Detach();captureClient_=capture.Detach();sampleEvent_=nullptr;appId_=appId;processId_=pid;captureFailed_=false;stopping_=false;thread_=CreateThread(nullptr,0,&ProcessSpectrumCapture::threadEntry,this,0,nullptr);if(!thread_){captureFailed_=true;}return thread_!=nullptr;
           }
 
-          void ProcessSpectrumCapture::stop(){stopping_=true;if(sampleEvent_)SetEvent(static_cast<HANDLE>(sampleEvent_));if(thread_.joinable())thread_.join();if(audioClient_)static_cast<IAudioClient*>(audioClient_)->Stop();if(captureClient_){static_cast<IAudioCaptureClient*>(captureClient_)->Release();captureClient_=nullptr;}if(audioClient_){static_cast<IAudioClient*>(audioClient_)->Release();audioClient_=nullptr;}if(sampleEvent_){CloseHandle(static_cast<HANDLE>(sampleEvent_));sampleEvent_=nullptr;}appId_.clear();processId_=0;captureFailed_=false;for(auto& band:bands_)band=0.f;}
+          void ProcessSpectrumCapture::stop(){stopping_=true;if(sampleEvent_)SetEvent(static_cast<HANDLE>(sampleEvent_));if(thread_){WaitForSingleObject(static_cast<HANDLE>(thread_),INFINITE);CloseHandle(static_cast<HANDLE>(thread_));thread_=nullptr;}if(audioClient_)static_cast<IAudioClient*>(audioClient_)->Stop();if(captureClient_){static_cast<IAudioCaptureClient*>(captureClient_)->Release();captureClient_=nullptr;}if(audioClient_){static_cast<IAudioClient*>(audioClient_)->Release();audioClient_=nullptr;}if(sampleEvent_){CloseHandle(static_cast<HANDLE>(sampleEvent_));sampleEvent_=nullptr;}appId_.clear();processId_=0;captureFailed_=false;for(auto& band:bands_)band=0.f;}
+
+          unsigned long __stdcall ProcessSpectrumCapture::threadEntry(void* context){static_cast<ProcessSpectrumCapture*>(context)->captureLoop();return 0;}
 
           void ProcessSpectrumCapture::captureLoop()
           {

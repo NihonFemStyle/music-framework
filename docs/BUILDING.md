@@ -20,8 +20,8 @@ Parameters:
 |---|---|---|
 | `-Configuration` | `Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel` | `Release` |
 | `-Architecture` | `x64`, `Win32`, `ARM64` | `x64` |
-| `-NoCRT` | Enables the experimental constrained no-CRT executable | Off |
-| `-SDL` | Builds the optional SDL3 OpenGL/Vulkan frontend | Off |
+| `-NoCRT` | Builds the full overlay and library without the C/C++ runtime | Off |
+| `-SDL` | Also builds the SDL3 frontend (`musicoverlay_sdl.exe`) | Off |
 | `-CLion` | Uses the matching CLion CMake preset and build tree | Off |
 | `-CLionToolchain` | `MSBuild`, `MinGW` | `MSBuild` |
 | `-Clean` | Removes the selected build tree before configuring | Off |
@@ -50,7 +50,7 @@ The original Visual Studio generator path remains the default and requires no Je
 
 ## CLion
 
-Open the repository root in a current CLion release and reload the CMake project. CLion detects `CMakePresets.json`. Every profile has explicit **Debug** and **Release** build presets. MSBuild profiles select the CLion toolchain named **Visual Studio** and cover Standard, SDL3 OpenGL/Vulkan, and experimental No-CRT builds for x64, Win32, and ARM64. Separate Standard and SDL presets select the toolchain named **MinGW**; their architecture comes from that toolchain.
+Open the repository root in a current CLion release and reload the CMake project. CLion detects `CMakePresets.json`. Every profile has explicit **Debug** and **Release** build presets. MSBuild profiles select the CLion toolchain named **Visual Studio** and cover Standard, SDL3, and No-CRT builds for x64, Win32, and ARM64. Separate Standard and SDL presets select the toolchain named **MinGW**; their architecture comes from that toolchain.
 
 ```powershell
 .\build.ps1 -CLion
@@ -75,18 +75,27 @@ Useful options:
 |---|---:|---|
 | `MUSICOVERLAY_BUILD_STANDALONE` | `ON` | Builds the desktop overlay. |
 | `MUSICOVERLAY_BUILD_INTEGRATION` | `ON` | Exposes the integration interface target. |
-| `MUSICOVERLAY_NOCRT` | `OFF` | Builds the minimal custom-entry-point executable. |
-| `MUSICOVERLAY_BUILD_SDL_FRONTEND` | `OFF` | Builds `musicoverlay_sdl` with OpenGL and Vulkan runtime selection. |
+| `MUSICOVERLAY_NOCRT` | `OFF` | Builds the overlay and library without the C/C++ runtime. See [No-CRT](NOCRT.md). |
+| `MUSICOVERLAY_BUILD_SDL_FRONTEND` | `OFF` | Builds `musicoverlay_sdl`, which presents through any SDL renderer. |
 | `MUSICOVERLAY_FETCH_SDL` | `ON` | Fetches the pinned SDL3 release when it is not installed. |
 
-Run the portable frontend with one of these renderer selections:
+## SDL3 frontend
+
+`musicoverlay_sdl.exe` has the same features as the native application: every layout and setting, media controls, the interaction shortcut, Windowed Stream Mode, Overkill spectra, Discord Rich Presence, the settings window, and a notification-area menu. It shares `settings.ini` with the native app. The overlay is drawn by the shared Direct2D painter into a CPU buffer, then presented through the selected SDL renderer, so it looks identical on every backend.
+
+Choose the renderer in the tray menu (**SDL renderer**) or the settings window; the change takes effect after a restart. A command-line override applies to one session:
 
 ```powershell
 .\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer opengl
 .\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer vulkan
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer direct3d11
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer direct3d12
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer gpu
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer software
+.\build-x64-sdl\Release\musicoverlay_sdl.exe --renderer auto
 ```
 
-The SDL frontend is currently Windows-first. Linux support, including MPRIS, PipeWire, Wayland/X11 behavior, and desktop integration, is planned for a future release.
+The default is OpenGL. If a requested renderer is unavailable, the frontend says so and falls back to SDL's default. Transparent overlay windows depend on the driver: OpenGL and Vulkan are the most reliable. If a Direct3D renderer shows an opaque background on your system, switch to one of those.
 
 ## Runtime and resources
 

@@ -1,3 +1,4 @@
+#if !defined(MUSICOVERLAY_MEDIA_ABI)
 #include <winrt/Windows.Storage.Streams.h>
 
 #include "Core/MetadataFormatter.h"
@@ -76,3 +77,4 @@ winrt::fire_and_forget MediaSessionManager::execute(Command command)
   }catch(...){ }
 }
             }
+#endif

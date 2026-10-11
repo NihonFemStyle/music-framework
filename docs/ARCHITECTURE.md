@@ -21,7 +21,7 @@ MediaSessionManager ──► OverlayState ──► FrameView
 
 ## Core
 
-`TrackInfo` is a renderer-independent snapshot containing metadata, playback state, timing, and encoded artwork bytes. `OverlayState` protects snapshot replacement with a mutex so asynchronous media updates and the window/render thread do not share mutable fields.
+`TrackInfo` is a renderer-independent snapshot containing metadata, playback state, timing, and encoded artwork bytes. `OverlayState` protects snapshot replacement with a slim reader/writer lock so asynchronous media updates and the window/render thread do not share mutable fields.
 
 ## Windows media adapter
 
@@ -31,13 +31,15 @@ MediaSessionManager ──► OverlayState ──► FrameView
 
 `IRenderer` accepts a borrowed `NativeTarget` and immutable `FrameView`. The renderer never owns host devices, swap chains, or command queues.
 
-The optional SDL3 host is a separate portable frontend. It selects SDL's OpenGL or Vulkan renderer at runtime and reuses the Windows media-session and source-spectrum services today. Linux platform services are intentionally future work; the native DirectX host and integration ABI remain independent of SDL.
+`SoftwareRenderer` runs the same painter into a premultiplied BGRA buffer. The SDL3 host uses it to present through any SDL renderer (OpenGL, Vulkan, Direct3D 11/12, SDL GPU, software). It reuses the Windows media-session, spectrum, Discord, settings, and settings-window components, so it matches the native host. The native DirectX host and integration ABI remain independent of SDL.
+
+The no-CRT build compiles the same library and standalone sources against `src/NoCRT`. Media discovery switches to `MediaSessionManagerAbi.cpp`, which uses the raw WinRT ABI. See [No-CRT](NOCRT.md).
 
 The shared `OverlayPainter` uses Direct2D, DirectWrite, and WIC. It handles custom-family text fitting, geometry-clipped complementary text, album-art decoding, rounded artwork clipping, progress interpolation, dynamic accent extraction, media controls, and embedded branding.
 
 ## Standalone host
 
-The Win32 application owns the overlay window, D3D11 device, DirectComposition swap chain, notification-area icon, 450 ms double-tap shortcut state machine, native color/font dialogs, settings persistence, and the dedicated Direct2D settings window. It keeps `WS_EX_TRANSPARENT` enabled outside interaction mode and enables ordinary input automatically in Windowed Stream Mode.
+The Win32 application owns the overlay window, a graphics host for the selected backend (Direct3D 9Ex in a DWM-extended layered window, or a Direct3D 10.1, 11, or 12 DirectComposition swap chain, with Direct3D 11 as the fallback), notification-area icon, 450 ms double-tap shortcut state machine, native color/font dialogs, settings persistence, and the dedicated Direct2D settings window. It keeps `WS_EX_TRANSPARENT` enabled outside interaction mode and enables ordinary input automatically in Windowed Stream Mode.
 
 ## Settings
 

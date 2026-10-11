@@ -1,8 +1,6 @@
 #include "DiscordRpc.h"
 
 #include <algorithm>
-#include <array>
-#include <chrono>
 #include <windows.h>
 
 namespace mo::win {
@@ -28,8 +26,22 @@ std::string escaped(const std::wstring& value)
 
 std::int64_t unixNow()
 {
-  return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  FILETIME now{};GetSystemTimeAsFileTime(&now);
+  ULARGE_INTEGER ticks{};ticks.LowPart=now.dwLowDateTime;ticks.HighPart=now.dwHighDateTime;
+  return static_cast<std::int64_t>((ticks.QuadPart-116444736000000000ULL)/10000000ULL);
 }
+}
+
+// IPC framing follows the proven DiscordRPC-NoCRT implementation: complete
+// writes, frame-aware reads, READY validation, and PING/PONG keep-alive.
+namespace {
+constexpr std::uint32_t kOpHandshake=0,kOpFrame=1,kOpClose=2,kOpPing=3,kOpPong=4;
+constexpr std::uint32_t kMaxPayload=16*1024;
+struct FrameHeader{std::uint32_t opcode;std::uint32_t length;};
+bool writeAll(HANDLE pipe,const void* data,DWORD size){auto* cursor=static_cast<const BYTE*>(data);while(size){DWORD written{};if(!WriteFile(pipe,cursor,size,&written,nullptr)||!written)return false;cursor+=written;size-=written;}return true;}
+bool readAll(HANDLE pipe,void* data,DWORD size){auto* cursor=static_cast<BYTE*>(data);while(size){DWORD read{};if(!ReadFile(pipe,cursor,size,&read,nullptr)||!read)return false;cursor+=read;size-=read;}return true;}
+bool waitForBytes(HANDLE pipe,DWORD bytes,DWORD timeoutMs){const auto start=GetTickCount64();for(;;){DWORD available{};if(!PeekNamedPipe(pipe,nullptr,0,nullptr,&available,nullptr))return false;if(available>=bytes)return true;if(GetTickCount64()-start>=timeoutMs)return false;Sleep(5);}}
+bool readFrame(HANDLE pipe,std::uint32_t& opcode,std::string& payload){FrameHeader header{};if(!readAll(pipe,&header,sizeof(header))||header.length>kMaxPayload)return false;payload.assign(header.length,'\0');if(header.length&&!readAll(pipe,payload.data(),header.length))return false;opcode=header.opcode;return true;}
 }
 
 DiscordRpc::~DiscordRpc(){disconnect();}
@@ -37,16 +49,15 @@ DiscordRpc::~DiscordRpc(){disconnect();}
 void DiscordRpc::disconnect()
 {
   HANDLE pipe=static_cast<HANDLE>(pipe_);
-  if(pipe)CloseHandle(pipe);
+  if(pipe){if(sendFrame(kOpClose,"{}"))CloseHandle(pipe);}
   pipe_=nullptr;connectedApplicationId_.clear();lastSignature_.clear();lastRevision_=~std::uint64_t{};lastSentTick_=0;
 }
 
 bool DiscordRpc::sendFrame(std::uint32_t opcode,const std::string& json)
 {
   HANDLE pipe=static_cast<HANDLE>(pipe_);if(!pipe)return false;
-  struct Header{std::uint32_t opcode;std::uint32_t length;}header{opcode,static_cast<std::uint32_t>(json.size())};
-  DWORD written{};
-  if(!WriteFile(pipe,&header,sizeof(header),&written,nullptr)||written!=sizeof(header)||(!json.empty()&&(!WriteFile(pipe,json.data(),static_cast<DWORD>(json.size()),&written,nullptr)||written!=json.size()))){disconnect();return false;}
+  const FrameHeader header{opcode,static_cast<std::uint32_t>(json.size())};
+  if(!writeAll(pipe,&header,sizeof(header))||(!json.empty()&&!writeAll(pipe,json.data(),static_cast<DWORD>(json.size())))){CloseHandle(pipe);pipe_=nullptr;connectedApplicationId_.clear();return false;}
   return true;
 }
 
@@ -55,12 +66,15 @@ bool DiscordRpc::connect(const std::wstring& applicationId)
   disconnect();
   for(int index=0;index<10;++index)
   {
-    const std::wstring path=L"\\\\.\\pipe\\discord-ipc-"+std::to_wstring(index);
+    const std::wstring path=L"\\\\?\\pipe\\discord-ipc-"+std::to_wstring(index);
     HANDLE pipe=CreateFileW(path.c_str(),GENERIC_READ|GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
     if(pipe==INVALID_HANDLE_VALUE)continue;
     pipe_=pipe;connectedApplicationId_=applicationId;
     const std::string handshake="{\"v\":1,\"client_id\":\""+escaped(applicationId)+"\"}";
-    if(sendFrame(0,handshake))return true;
+    std::uint32_t opcode{};std::string response;
+    if(sendFrame(kOpHandshake,handshake)&&waitForBytes(pipe,sizeof(FrameHeader),3000)&&readFrame(pipe,opcode,response)&&opcode==kOpFrame&&response.find("\"evt\":\"READY\"")!=std::string::npos)return true;
+    if(pipe_){CloseHandle(pipe);pipe_=nullptr;}
+    connectedApplicationId_.clear();
   }
   return false;
 }
@@ -68,8 +82,16 @@ bool DiscordRpc::connect(const std::wstring& applicationId)
 void DiscordRpc::drainResponses()
 {
   HANDLE pipe=static_cast<HANDLE>(pipe_);if(!pipe)return;
-  DWORD available{};std::array<char,4096> buffer{};
-  while(PeekNamedPipe(pipe,nullptr,0,nullptr,&available,nullptr)&&available){DWORD read{};if(!ReadFile(pipe,buffer.data(),static_cast<DWORD>(std::min<std::size_t>(buffer.size(),available)),&read,nullptr)||!read){disconnect();return;}}
+  for(;;)
+  {
+    DWORD available{};
+    if(!PeekNamedPipe(pipe,nullptr,0,nullptr,&available,nullptr)){CloseHandle(pipe);pipe_=nullptr;connectedApplicationId_.clear();return;}
+    if(available<sizeof(FrameHeader))return;
+    std::uint32_t opcode{};std::string payload;
+    if(!readFrame(pipe,opcode,payload)){CloseHandle(pipe);pipe_=nullptr;connectedApplicationId_.clear();return;}
+    if(opcode==kOpPing){if(!sendFrame(kOpPong,payload))return;}
+    else if(opcode==kOpClose){CloseHandle(pipe);pipe_=nullptr;connectedApplicationId_.clear();return;}
+  }
 }
 
 void DiscordRpc::update(const TrackInfo& track,const DiscordRpcSettings& settings)
@@ -99,7 +121,7 @@ void DiscordRpc::update(const TrackInfo& track,const DiscordRpcSettings& setting
   }
   activity+=",\"buttons\":[{\"label\":\"Trigon.Systems\",\"url\":\"https://trigon.systems\"},{\"label\":\"GitHub Repo\",\"url\":\"https://github.com/NihonFemStyle/Music-Framework\"}],\"instance\":false}";
   const std::string payload="{\"cmd\":\"SET_ACTIVITY\",\"args\":{\"pid\":"+std::to_string(processId)+",\"activity\":"+activity+"},\"nonce\":\""+std::to_string(++nonce_)+"\"}";
-  sendFrame(1,payload);
+  sendFrame(kOpFrame,payload);
 }
 
 }

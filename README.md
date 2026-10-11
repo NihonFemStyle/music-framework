@@ -40,8 +40,8 @@ Nihon's Music Framework reads the active Windows media session, renders a native
 - Optional Discord Rich Presence with music metadata, playback timestamps, configurable assets, and project links
 - Embedded banner, application icon, and Release runtime dependencies
 - Renderer abstraction for Direct3D 9, 10, 11, and 12 integration
-- Optional SDL3 frontend with selectable OpenGL and Vulkan rendering
-- Explicitly constrained experimental no-CRT build path
+- Optional SDL3 frontend with full feature parity, presenting through any SDL renderer (OpenGL, Vulkan, Direct3D 11/12, SDL GPU, software)
+- No-CRT build of the complete overlay and integration library (no VCRUNTIME, MSVCP, or UCRT imports)
 
 ## Preview
 
@@ -156,18 +156,18 @@ Pushes to `main` build downloadable cutting-edge artifacts only when files under
 
 | Backend | Integration object | Included UI rendering | Standalone host | Notes |
 |---|---:|---:|---:|---|
-| Direct3D 9 | Yes | Limited native backbuffer text | No | Requires a compatible backbuffer `GetDC` path. |
-| Direct3D 10 | Yes | Direct2D/DirectWrite | No | Host supplies device and swap chain. |
-| Direct3D 11 | Yes | Direct2D/DirectWrite/WIC | **Yes** | Full standalone experience. |
-| Direct3D 12 | Binding validation | Host-rendered | No | Host owns command recording, resource states, and synchronization. |
-| OpenGL | SDL3 renderer | Portable draw path | Optional | Compatibility-oriented standalone frontend. |
-| Vulkan | SDL3 renderer | Portable draw path | Optional | Modern standalone frontend. |
+| Direct3D 9 | Yes | Full painter (texture upload) | **Yes** | 9Ex host; transparent via the DWM-extended layered window. |
+| Direct3D 10 | Yes | Direct2D/DirectWrite/WIC | **Yes** | 10.1 device with a DirectComposition swap chain. |
+| Direct3D 11 | Yes | Direct2D/DirectWrite/WIC | **Yes** | Default and reference backend. |
+| Direct3D 12 | Yes | Direct2D via D3D11On12 | **Yes** | Documented queue-ordering and resource-state contract. |
+| OpenGL | SDL3 renderer | Shared painter, SDL presentation | Optional | Default SDL renderer; most reliable transparency. |
+| Vulkan | SDL3 renderer | Shared painter, SDL presentation | Optional | Also available: Direct3D 11/12, SDL GPU, software. |
 
-The abstraction intentionally does not inject unsafe D3D12 commands into an unknown host command list. See [Integration](docs/INTEGRATION.md).
+The standalone renderer setting chooses the host; it falls back to Direct3D 11 if the chosen backend cannot start. The D3D12 renderer never records into the host's command lists: it submits through D3D11On12 on the host's queue. See [Integration](docs/INTEGRATION.md).
 
 ### SDL3 frontend
 
-The optional `musicoverlay_sdl` application is a Windows-first preview of the portable frontend. Build it with `.\build.ps1 -SDL`, then select `--renderer opengl` for compatibility or `--renderer vulkan` for the modern path. It does not replace the native DirectX application, and it is excluded from no-CRT builds.
+The optional `musicoverlay_sdl` application matches the native application feature for feature and shares its settings file. Build it with `.\build.ps1 -SDL`, then choose a renderer from the tray menu or pass `--renderer opengl|vulkan|direct3d11|direct3d12|gpu|software|auto`. It is excluded from no-CRT builds because SDL3 needs the CRT.
 
 Linux is a planned future feature. The intended Linux platform layer will use MPRIS for media sessions and PipeWire for audio capture, with compositor-dependent X11/Wayland overlay behavior. macOS is not supported.
 
@@ -180,7 +180,7 @@ src/Platform/Windows/       GSMTC and Windows platform code
 src/Renderer/               D3D9–D3D12 renderer implementations
 src/UI/                     Direct2D/DirectWrite/WIC overlay painter
 src/Standalone/             Win32 application, resources, and manifest
-src/NoCRT/                  Experimental minimal no-CRT entry point
+src/NoCRT/                  No-CRT runtime support and entry point
 assets/                     Embedded banner and application icon sources
 docs/                       Design, build, integration, and no-CRT guides
 ```
@@ -199,12 +199,10 @@ docs/                       Design, build, integration, and no-CRT guides
 
 ## Known limitations
 
-- The standalone application currently creates a Direct3D 11 device regardless of the saved renderer preference.
-- D3D9 UI support is intentionally limited.
-- D3D12 requires a host-specific command-list and synchronization contract.
+- Windowed Stream Mode transparency for capture tools requires the Direct3D 10, 11, or 12 hosts. The Direct3D 9 host shows the panel on an opaque background in that mode.
 - Media availability and metadata quality depend on the source application's GSMTC implementation.
 - Source-isolated spectrum capture is best effort and may be unavailable for protected audio or media sessions that Windows cannot map back to a process.
-- The no-CRT executable is a minimal experiment and does not include the full overlay feature set.
+- The no-CRT build covers the full overlay; the SDL frontend is the only component that requires the CRT.
 
 ## License
 

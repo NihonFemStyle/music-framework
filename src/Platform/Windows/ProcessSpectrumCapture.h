@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <thread>
 namespace mo::win
 {
 class ProcessSpectrumCapture
@@ -24,6 +23,7 @@ class ProcessSpectrumCapture
   private:
   bool startForProcess(const std::wstring& appId,std::uint32_t processId);
   void captureLoop();
+  static unsigned long __stdcall threadEntry(void* context);
   std::wstring appId_;
   std::uint32_t processId_{};
   std::atomic_bool stopping_{};
@@ -33,7 +33,7 @@ class ProcessSpectrumCapture
   void* audioClient_{};
   void* captureClient_{};
   void* sampleEvent_{};
-  std::thread thread_;
+  void* thread_{}; // Win32 thread handle (no std::thread, so the no-CRT build can share this code)
   std::uint32_t sampleRate_{};
   std::uint16_t channels_{};
   bool floatSamples_{};

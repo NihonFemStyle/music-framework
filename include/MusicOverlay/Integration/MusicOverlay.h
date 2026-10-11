@@ -8,8 +8,10 @@ class IntegrationContext {
 public:
   explicit IntegrationContext(Backend backend) : renderer_(createRenderer(backend)) {}
   bool initialize(const NativeTarget& target) { return renderer_ && renderer_->initialize(target); }
-  void resize(std::uint32_t w, std::uint32_t h) { renderer_->resize(w, h); }
-  void render(const FrameView& frame) { renderer_->render(frame); }
+  // Call releaseTargets() before ResizeBuffers/Reset, then resize() afterwards.
+  void releaseTargets() { if (renderer_) renderer_->releaseTargets(); }
+  void resize(std::uint32_t w, std::uint32_t h) { if (renderer_) renderer_->resize(w, h); }
+  void render(const FrameView& frame) { if (renderer_) renderer_->render(frame); }
 private:
   std::unique_ptr<IRenderer> renderer_;
 };

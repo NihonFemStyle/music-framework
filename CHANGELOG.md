@@ -2,12 +2,28 @@
 
 All notable changes to Nihon's Music Framework are documented here. The project follows semantic versioning.
 
-## [Unreleased]
+## [2.0.0] 2026-10-11
 
-- Additional standalone Direct3D hosts
-- A complete D3D12 command-recording contract
-- Expanded no-CRT experimentation
-- Future Linux support through MPRIS, PipeWire, and SDL3
+### Added
+
+- Complete no-CRT build. The full standalone overlay and the integration library build without VCRUNTIME, MSVCP, or the Universal CRT for x64, Win32, and ARM64, using a minimal runtime in `src/NoCRT`
+- Raw WinRT ABI media-session implementation for the no-CRT build (polling worker thread, thumbnail streaming through `CreateStreamOverRandomAccessStream`)
+- `mo::SoftwareRenderer`: renders the shared painter into a premultiplied BGRA buffer for any graphics API
+- SDL3 frontend feature parity: all layouts and settings, media controls, interaction shortcut, Windowed Stream Mode, Overkill spectra, Discord Rich Presence, the settings window, and an SDL tray menu
+- SDL renderer selection across every available SDL driver (OpenGL, Vulkan, Direct3D 11/12, SDL GPU, software), persisted in settings with a `--renderer` override and an automatic fallback
+- Standalone Direct3D 9, 10, and 12 hosts. The renderer setting now selects the backend, with an automatic Direct3D 11 fallback and a notice
+- Complete Direct3D 12 renderer that draws the full overlay through D3D11On12 on the host's queue, with a documented ordering, resource-state (`NativeTarget::resourceState`), format, and resize contract
+- Direct3D 9 renderer feature parity: the shared painter is uploaded to a texture and drawn as a premultiplied quad with full host state save/restore, inside or outside the host's scene
+- `IRenderer::releaseTargets()` / `IntegrationContext::releaseTargets()` for releasing swap-chain references before `ResizeBuffers` or device `Reset`
+- Pull-request CI job that builds no-CRT x64/Win32/ARM64 and fails if runtime DLLs are imported
+
+### Changed
+
+- Settings window redesigned after the CyberiaStyle LAST APPROACH options screens: shard-field background, olive side panel and glass main panel, angular header with hazard stripes and outlined page digits, amber row titles, every choice listed inline with an animated teal bracket cursor, a gradient focus strip, a segmented transparency meter, hover explanations, DPI awareness, and a dark caption. Drawn entirely with Direct2D; no theme assets are embedded
+- Settings loading and saving moved into a shared module used by the native, no-CRT, and SDL frontends
+- `OverlayState` uses an SRW lock, spectrum capture uses a Win32 thread, and Discord timestamps use `GetSystemTimeAsFileTime`, so the shared code no longer needs `<mutex>`, `<thread>`, or `<chrono>`
+- Discord RPC now uses framed reads, validates the READY handshake, and answers PING frames, following the DiscordRPC-NoCRT proof
+
 
 ## [1.4.1] - 2026-10-07
 
