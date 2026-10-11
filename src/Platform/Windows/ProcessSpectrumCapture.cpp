@@ -32,11 +32,13 @@ namespace
     ActivationHandler():event_(CreateEventW(nullptr,TRUE,FALSE,nullptr)){}
     ~ActivationHandler(){if(event_)CloseHandle(event_);}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** object) override{if(!object)return E_POINTER;*object=nullptr;if(iid==__uuidof(IUnknown)||iid==__uuidof(IActivateAudioInterfaceCompletionHandler))*object=static_cast<IActivateAudioInterfaceCompletionHandler*>(this);else if(iid==__uuidof(IAgileObject))*object=static_cast<IAgileObject*>(this);else return E_NOINTERFACE;AddRef();return S_OK;}
-    ULONG STDMETHODCALLTYPE AddRef() override{return InterlockedIncrement(&refs_);}
-    ULONG STDMETHODCALLTYPE Release() override{ULONG value=InterlockedDecrement(&refs_);if(!value)delete this;return value;}
+    // Reference counting under an SRW lock rather than Interlocked* intrinsics, which the
+    // ARM64 no-CRT link cannot resolve.
+    ULONG STDMETHODCALLTYPE AddRef() override{AcquireSRWLockExclusive(&lock_);const ULONG value=static_cast<ULONG>(++refs_);ReleaseSRWLockExclusive(&lock_);return value;}
+    ULONG STDMETHODCALLTYPE Release() override{AcquireSRWLockExclusive(&lock_);const ULONG value=static_cast<ULONG>(--refs_);ReleaseSRWLockExclusive(&lock_);if(!value)delete this;return value;}
     HRESULT STDMETHODCALLTYPE ActivateCompleted(IActivateAudioInterfaceAsyncOperation* operation) override{ComPtr<IUnknown> object;operation->GetActivateResult(&result_,&object);if(SUCCEEDED(result_))object.As(&client_);SetEvent(event_);return S_OK;}
     HANDLE event()const{return event_;}HRESULT result()const{return result_;}IAudioClient* client()const{return client_.Get();}
-    private:LONG refs_{1};HANDLE event_{};HRESULT result_{E_PENDING};ComPtr<IAudioClient> client_;
+    private:SRWLOCK lock_=SRWLOCK_INIT;LONG refs_{1};HANDLE event_{};HRESULT result_{E_PENDING};ComPtr<IAudioClient> client_;
     };
     }
 

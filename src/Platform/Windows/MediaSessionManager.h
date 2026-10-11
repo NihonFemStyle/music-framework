@@ -29,8 +29,11 @@ class MediaSessionManager
   OverlayState& state_;
   void* thread_{};
   void* wake_{};
+  // Plain volatile flag plus an SRW lock for the command mask: Interlocked*
+  // intrinsics do not resolve in the ARM64 no-CRT link.
   volatile long stopped_{};
-  volatile long commands_{};
+  long commands_{};
+  void* commandLock_{}; // SRWLOCK storage (SRWLOCK_INIT is a null pointer)
   };
   }
 #else

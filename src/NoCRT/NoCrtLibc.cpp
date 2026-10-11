@@ -26,6 +26,26 @@ void __stosb(unsigned char* destination, unsigned char value, size_t count);
 #pragma intrinsic(__movsb, __stosb)
 #endif
 
+// Declared before #pragma function so MSVC knows these names (avoids C4164).
+void* __cdecl memset(void*, int, size_t);
+void* __cdecl memcpy(void*, const void*, size_t);
+void* __cdecl memmove(void*, const void*, size_t);
+int __cdecl memcmp(const void*, const void*, size_t);
+void* __cdecl memchr(const void*, int, size_t);
+size_t __cdecl strlen(const char*);
+size_t __cdecl wcslen(const wchar_t*);
+int __cdecl abs(int);
+long __cdecl labs(long);
+double __cdecl fabs(double);
+double __cdecl sqrt(double);
+double __cdecl sin(double);
+double __cdecl cos(double);
+double __cdecl exp(double);
+double __cdecl log(double);
+double __cdecl pow(double, double);
+double __cdecl fmod(double, double);
+double __cdecl floor(double);
+double __cdecl ceil(double);
 #pragma function(memset, memcpy, memmove, memcmp, memchr, strlen, wcslen, abs, labs, fabs, sqrt, sin, cos, exp, log, pow, fmod, floor, ceil)
 
 // The compiler emits a reference to _fltused whenever floating point is used.
@@ -302,6 +322,15 @@ double __cdecl cos(double value)
 // On x86 the CRT headers implement the float variants inline on top of the
 // double functions; elsewhere they are real exports that must be provided.
 #if !defined(_M_IX86)
+float __cdecl sqrtf(float);
+float __cdecl sinf(float);
+float __cdecl cosf(float);
+float __cdecl expf(float);
+float __cdecl logf(float);
+float __cdecl powf(float, float);
+float __cdecl fmodf(float, float);
+float __cdecl floorf(float);
+float __cdecl ceilf(float);
 #pragma function(sqrtf, sinf, cosf, expf, logf, powf, fmodf, floorf, ceilf)
 float __cdecl sqrtf(float value) { return static_cast<float>(sqrt(value)); }
 float __cdecl sinf(float value) { return static_cast<float>(sin(value)); }

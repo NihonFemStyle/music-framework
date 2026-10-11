@@ -37,7 +37,8 @@ From a Developer PowerShell, `build.ps1` checks the result with `dumpbin /depend
   - `NoCrtLibc.cpp`: `mem*`, `strlen`/`wcslen`, `wcstol`, wide character classification, and `sqrt`/`sin`/`cos`/`exp`/`log`/`pow`/`fmod`/`floor`/`ceil`, plus `_fltused` and the CRT failure hooks. It includes no headers and is compiled with `/Oi-`.
   - `NoCrtCxx.cpp`: global `operator new`/`delete`, including the aligned and nothrow forms, on the process heap. Also the `std::_X*` error hooks the STL calls when exceptions are disabled.
   - `NoCrtStartup.cpp`: runs `.CRT$XI*`/`.CRT$XC*` static initializers and `atexit` destructors.
-  - `NoCrtX86.cpp`: x86-only. Provides the SSE2 conversion helpers (`_dtol3`, `_dtoul3`, `_ltod3`, ...). The 64-bit integer helpers (`_alldiv`, `_allmul`, ...) are linked from `ntdll.lib`.
+  - `NoCrtX86.cpp`: x86-only. Provides the 64-bit integer helpers (`_allmul`, `_alldiv`, `_aulldiv`, `_allrem`, `_aullrem`, `_alldvrm`, `_aulldvrm`, `_allshl`, `_allshr`, `_aullshr`) and the SSE2 conversion helpers (`_dtol3`, `_dtoul3`, `_dtoui3`, `_ftol3`, `_ftoul3`, `_ftoui3`, `_ltod3`, `_ultod3`, `_ltof3`, `_ultof3`). It uses only 32-bit arithmetic, so unoptimized builds cannot recurse into the helpers. x86 builds also compile with `/Oi-` so math calls are not replaced by CRT-only SSE2 entry points.
+  - Shared code avoids `Interlocked*`; it uses SRW locks, which resolve on every architecture.
   - `NoCrtMain.cpp`: the entry point.
 - **Media:** `MediaSessionManagerAbi.cpp` drives `GlobalSystemMediaTransportControlsSessionManager` through `RoGetActivationFactory` and the ABI interfaces. It polls `IAsyncInfo` instead of using coroutines and reads thumbnails through `CreateStreamOverRandomAccessStream`. The normal build keeps its C++/WinRT implementation.
 - **Discord RPC:** framed IPC with complete writes, READY validation, and PING/PONG keep-alive. This follows the standalone DiscordRPC-NoCRT proof.

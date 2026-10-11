@@ -282,14 +282,16 @@ MediaSessionManager::~MediaSessionManager() { stop(); }
 void MediaSessionManager::start()
 {
   if (thread_) return;
-  InterlockedExchange(&stopped_, 0);
+  stopped_ = 0;
   wake_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
   thread_ = CreateThread(nullptr, 0, &MediaSessionManager::threadEntry, this, 0, nullptr);
 }
 
 void MediaSessionManager::queue(long command)
 {
-  InterlockedOr(&commands_, command);
+  AcquireSRWLockExclusive(reinterpret_cast<PSRWLOCK>(&commandLock_));
+  commands_ |= command;
+  ReleaseSRWLockExclusive(reinterpret_cast<PSRWLOCK>(&commandLock_));
   if (wake_) SetEvent(static_cast<HANDLE>(wake_));
 }
 
@@ -302,7 +304,7 @@ void MediaSessionManager::cycleRepeat() { queue(CommandRepeat); }
 
 void MediaSessionManager::stop() noexcept
 {
-  InterlockedExchange(&stopped_, 1);
+  stopped_ = 1;
   if (wake_) SetEvent(static_cast<HANDLE>(wake_));
   if (thread_)
   {
@@ -331,7 +333,10 @@ void MediaSessionManager::run()
     }
     while (!stopped_)
     {
-      const long commands = InterlockedExchange(&commands_, 0);
+      AcquireSRWLockExclusive(reinterpret_cast<PSRWLOCK>(&commandLock_));
+      const long commands = commands_;
+      commands_ = 0;
+      ReleaseSRWLockExclusive(reinterpret_cast<PSRWLOCK>(&commandLock_));
       if (commands & ~CommandRefresh) worker.execute(commands);
       if (stopped_) break;
       worker.refresh();

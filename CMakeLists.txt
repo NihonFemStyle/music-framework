@@ -56,6 +56,13 @@ set(MO_NOCRT_DEFINITIONS
   _USE_STD_VECTOR_ALGORITHMS=0
   _CRT_SECURE_NO_WARNINGS)
 set(MO_NOCRT_FLAGS /GS- /GR- /EHs-c- /Zl /Gs1048576 /Zc:threadSafeInit- /sdl- /permissive- /Zc:__cplusplus)
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  # 32-bit x86: with intrinsics enabled, MSVC replaces sin/cos/pow/exp/sqrt/fmod
+  # calls with CRT-only SSE2 entry points (__libm_sse2_*_precise, _CIfmod).
+  # Disabling the function-form intrinsics keeps them as ordinary calls into
+  # src/NoCRT/NoCrtLibc.cpp. Interlocked and other intrinsic-only functions are unaffected.
+  list(APPEND MO_NOCRT_FLAGS /Oi-)
+endif()
 # Restricted to C/C++ so the options never reach the resource compiler.
 set(MO_NOCRT_OPTIONS)
 foreach(flag IN LISTS MO_NOCRT_FLAGS)
@@ -75,11 +82,9 @@ if(MUSICOVERLAY_NOCRT)
   # The libc file must not have its loops recognized and replaced by calls to itself.
   set_source_files_properties(src/NoCRT/NoCrtLibc.cpp PROPERTIES COMPILE_OPTIONS "/Oi-")
   target_include_directories(musicoverlay_nocrt_runtime PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/NoCRT>)
+  # On 32-bit x86 the 64-bit integer and conversion helpers (_alldiv, _allmul,
+  # _aulldvrm, _allshl, _dtol3, _ultof3, ...) are implemented in NoCrtX86.cpp.
   target_link_libraries(musicoverlay_nocrt_runtime PUBLIC kernel32 user32)
-  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-    # 32-bit x86: 64-bit integer helpers (_alldiv, _allmul, ...) come from the OS.
-    target_link_libraries(musicoverlay_nocrt_runtime PUBLIC ntdll)
-  endif()
 endif()
 
 # ---------------------------------------------------------------------------
