@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/banner.png" alt="Nihon's Music Framework" width="760"></p>
+<p align="center"><img src="assets/readme-banner.png" alt="Nihon's Music Framework: open-source Windows music overlay" width="900"></p>
 
 <h1 align="center">Nihon's Music Framework</h1>
 
@@ -59,6 +59,13 @@ Nihon's Music Framework reads the active Windows media session, renders a native
   </tr>
   <tr>
     <td colspan="2" align="center"><strong>Overkill — custom font and artwork spectrum</strong><br><img src="docs/images/overkill-custom-font.png" alt="Overkill mode using a custom installed font and artwork spectrum"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><strong>Settings window — General</strong> <sub>(design preview)</sub><br><img src="docs/images/settings-general.png" alt="CSLA-inspired settings window, General page, with the Dynamic Accent row focused" width="660"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Settings window — Overkill</strong> <sub>(design preview)</sub><br><img src="docs/images/settings-overkill.png" alt="Settings window, Overkill page, with every spectrum choice listed inline" width="420"></td>
+    <td align="center"><strong>Settings window — Discord RPC</strong> <sub>(design preview)</sub><br><img src="docs/images/settings-discord.png" alt="Settings window, Discord RPC page, editing the application ID" width="420"></td>
   </tr>
 </table>
 
